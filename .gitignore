@@ -19,3 +19,12 @@ obj/
 # 사용자 설정 파일 (내 컴퓨터 설정이므로 공유 X)
 *.user
 *.suo
+
+# --- NuGet Packages (외부 라이브러리 무시) ---
+packages/
+*.nupkg
+
+# --- Visual Studio 개인 설정 파일 무시 ---
+DocumentLayout.json
+DocumentLayout.backup.json
+*.json
