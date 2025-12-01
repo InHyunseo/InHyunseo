@@ -10,3 +10,12 @@ __pycache__/
 *.dll
 *.so
 *.out
+
+# --- C# / .NET Ignore Rules ---
+# 빌드 결과물 (절대 올리지 말 것)
+bin/
+obj/
+
+# 사용자 설정 파일 (내 컴퓨터 설정이므로 공유 X)
+*.user
+*.suo
