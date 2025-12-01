@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.IO.Ports; //C#에서 시리얼 통신 위해 반드시 추가해야 하는 네임스페이스
-
+using System.Net.Sockets; // TCP 통신을 위해 필수!
 
 namespace WindowsFormsApp1
 {
@@ -47,6 +47,11 @@ namespace WindowsFormsApp1
         private EOGprocess eogFilter2 = new EOGprocess(); 
 
         string thisdate = DateTime.Now.ToString("yyMMdd");
+
+        // [TCP 통신용 변수 추가]
+        private TcpClient client;
+        private NetworkStream stream;
+        private bool isConnected = false;
 
 
         public Form1()
