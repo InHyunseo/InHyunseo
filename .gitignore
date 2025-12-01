@@ -2,3 +2,11 @@ venvs/
 __pycache__/
 *.pyc
 *.pt
+
+# --- C/C++ Build Files ---
+*.exe
+*.o
+*.obj
+*.dll
+*.so
+*.out
