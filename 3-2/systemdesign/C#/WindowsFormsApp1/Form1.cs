@@ -104,6 +104,8 @@ namespace WindowsFormsApp1
                 txtBaudRate.Text = "115200";
                 CheckForIllegalCrossThreadCalls = false;
                 txtDate.Text = thisdate;
+
+            ConnectToPythonServer(); // 파이썬 서버 연결 시도
         }
 
         private void BtnOpen_Click(object sender, EventArgs e)
@@ -278,6 +280,30 @@ namespace WindowsFormsApp1
 
                             input_Draw_1 = input_Data_1; // 차트에 그릴 데이터 업데이트
                             input_Draw_2 = input_Data_2;
+
+                            //---TCP 코드 추가됨---
+                            //if (K_Horz != 0 && K_Vert != 0 && isConnected && stream != null)
+                            if (isConnected && stream != null)
+                            {
+                                try
+                                {
+                                    //double x = (filteredData - val_Center) * K_Horz; // 수평 각도
+                                    //double y = (filteredData2 - val_Center) * K_Vert; // 수직 각도
+
+                                    double x = 10.5; //연결 확인을 위함
+                                    double y = -3.3;
+
+                                    string msg = $"{x:F2}, {y:F2}\n"; // 소수점 둘째 자리까지 포맷팅
+                                    byte[] dataToSend = Encoding.UTF8.GetBytes(msg);
+                                    stream.Write(dataToSend, 0, dataToSend.Length);
+                                }
+                                catch
+                                {
+                                    {
+                                        isConnected = false;
+                                    }
+                                }
+                            }
                         }
                         // 다음 패킷을 받기 위해 플래그와 카운터 초기화
                         start_flag = 0;
@@ -294,6 +320,31 @@ namespace WindowsFormsApp1
             if (scope1.Channels.Count > 1)
             {
                 scope1.Channels[1].Data.SetYData(input_Data_2);
+            }
+        }
+        // === 파이썬 서버 연결 함수 ===
+        private void ConnectToPythonServer()
+        {
+            try
+            {
+                // 1. 아까 만든 변수(client)에 실제 연결 객체를 생성해서 저장(할당)합니다.
+                // "내 컴퓨터(127.0.0.1)의 5000번 포트로 연결해라"
+                client = new TcpClient("127.0.0.1", 5000);
+                
+                // 2. 아까 만든 변수(stream)에 데이터 통로를 저장합니다.
+                stream = client.GetStream();
+                
+                // 3. 연결 성공 깃발을 듭니다.
+                isConnected = true;
+                
+                MessageBox.Show("Python 서버와 연결 성공!");
+            }
+            catch (Exception ex)
+            {
+                // 실패하면 변수들은 null 상태거나 연결 안 됨 상태로 남습니다.
+                isConnected = false;
+                // 파이썬이 안 켜져 있으면 에러가 나므로, 테스트할 땐 파이썬을 먼저 켜야 합니다.
+                // MessageBox.Show("연결 실패: " + ex.Message); 
             }
         }
 
