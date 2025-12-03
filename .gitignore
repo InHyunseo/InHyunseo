@@ -28,3 +28,6 @@ packages/
 DocumentLayout.json
 DocumentLayout.backup.json
 *.json
+
+
+*.mp3

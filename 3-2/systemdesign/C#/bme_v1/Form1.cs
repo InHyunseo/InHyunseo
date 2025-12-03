@@ -44,7 +44,7 @@ namespace WindowsFormsApp1
 
 
         private EOGprocess eogFilter = new EOGprocess(); //EOG 필터링 객체 불러오기
-        private EOGprocess eogFilter2 = new EOGprocess(); 
+        private EOGprocess eogFilter2 = new EOGprocess();
 
         string thisdate = DateTime.Now.ToString("yyMMdd");
 
@@ -52,6 +52,9 @@ namespace WindowsFormsApp1
         private TcpClient client;
         private NetworkStream stream;
         private bool isConnected = false;
+
+        // Gaze 계산 객체
+        private GazeCalculator gazeCalc = new GazeCalculator();
 
 
         public Form1()
@@ -77,9 +80,9 @@ namespace WindowsFormsApp1
         private void Form1_FormClosed(object sender, FormClosedEventArgs e)
         {
             if (null != sPort)
+            {
+                if (sPort.IsOpen)
                 {
-                     if (sPort.IsOpen)
-                    {
                     sPort.Close();
                     sPort.Dispose();
                     sPort = null;
@@ -91,19 +94,19 @@ namespace WindowsFormsApp1
         {
             btnOpen.Enabled = true;
             btnClose.Enabled = false;
-            
+
             cboPortName.BeginUpdate();
             foreach (string comport in SerialPort.GetPortNames())
-                {
+            {
                 cboPortName.Items.Add(comport);
-                 }
-                cboPortName.EndUpdate();
-                
-                //포트 자동 선택(없으면 기본값)
-                cboPortName.SelectedItem = "COM4";
-                txtBaudRate.Text = "115200";
-                CheckForIllegalCrossThreadCalls = false;
-                txtDate.Text = thisdate;
+            }
+            cboPortName.EndUpdate();
+
+            //포트 자동 선택(없으면 기본값)
+            cboPortName.SelectedItem = "COM4";
+            txtBaudRate.Text = "115200";
+            CheckForIllegalCrossThreadCalls = false;
+            txtDate.Text = thisdate;
 
             ConnectToPythonServer(); // 파이썬 서버 연결 시도
         }
@@ -112,11 +115,11 @@ namespace WindowsFormsApp1
         {
             try
             {
-                if(null== sPort)
-                    {
+                if (null == sPort)
+                {
                     sPort = new SerialPort();
                     sPort.DataReceived += new SerialDataReceivedEventHandler(SPort_DataReceived);
-                   
+
                     sPort.PortName = cboPortName.SelectedItem.ToString();
                     sPort.BaudRate = Convert.ToInt32(txtBaudRate.Text);
                     sPort.DataBits = (int)8;
@@ -185,7 +188,7 @@ namespace WindowsFormsApp1
                     btnClose.Enabled = false;
                 }
             }
-            catch(System.Exception ex)
+            catch (System.Exception ex)
             {
                 MessageBox.Show(ex.Message);
             }
@@ -282,26 +285,30 @@ namespace WindowsFormsApp1
                             input_Draw_2 = input_Data_2;
 
                             //---TCP 코드 추가됨---
-                            //if (K_Horz != 0 && K_Vert != 0 && isConnected && stream != null)
-                            if (isConnected && stream != null)
+                            // 1. 연결되어 있고, 캘리브레이션이 완료된 상태라면?
+                            if (isConnected && stream != null && gazeCalc.IsCalibrated)
                             {
                                 try
                                 {
-                                    double x = (filteredData - val_Center) * K_Horz; // 수평 각도
-                                    double y = (filteredData2 - val_Center) * K_Vert; // 수직 각도
+                                    // 2. GazeCalculator를 통해 각도 계산 (특허 알고리즘 적용됨)
+                                    double angleH, angleV;
+                                    gazeCalc.CalculateGaze(filteredData, filteredData2, out angleH, out angleV);
 
-                                    //double x = 10.5; //연결 확인을 위함
-                                    //double y = -3.3;
+                                    // [선택 A] 각도(Angle)를 그대로 보내고 싶을 때
+                                    string msg = $"{angleH:F2},{angleV:F2}\n";
 
-                                    string msg = $"{x:F2}, {y:F2}\n"; // 소수점 둘째 자리까지 포맷팅
+                                    // [선택 B] 화면 픽셀 좌표(Pixel)로 변환해서 보내고 싶을 때 (추천)
+                                    // (파이썬 OpenCV 창 크기가 640x480이라고 가정)
+                                    // System.Drawing.Point pixel = gazeCalc.GetCameraCoordinates(angleH, angleV, 640, 480);
+                                    // string msg = $"{pixel.X},{pixel.Y}\n";
+
+                                    // 3. TCP 전송
                                     byte[] dataToSend = Encoding.UTF8.GetBytes(msg);
                                     stream.Write(dataToSend, 0, dataToSend.Length);
                                 }
                                 catch
                                 {
-                                    {
-                                        isConnected = false;
-                                    }
+                                    isConnected = false; // 에러나면 연결 끊김 처리
                                 }
                             }
                         }
@@ -313,7 +320,7 @@ namespace WindowsFormsApp1
             }
         }
 
-     
+
         private void On_timer1(object sender, EventArgs e)
         {
             scope1.Channels[0].Data.SetYData(input_Data_1);
@@ -329,14 +336,14 @@ namespace WindowsFormsApp1
             {
                 // 1. 아까 만든 변수(client)에 실제 연결 객체를 생성해서 저장(할당)합니다.
                 // "내 컴퓨터(127.0.0.1)의 5000번 포트로 연결해라"
-                client = new TcpClient("192.168.10.5", 5000);
-                
+                client = new TcpClient("192.168.165.70", 5000);
+
                 // 2. 아까 만든 변수(stream)에 데이터 통로를 저장합니다.
                 stream = client.GetStream();
-                
+
                 // 3. 연결 성공 깃발을 듭니다.
                 isConnected = true;
-                
+
                 MessageBox.Show("Python 서버와 연결 성공!");
             }
             catch (Exception ex)
@@ -351,24 +358,18 @@ namespace WindowsFormsApp1
         // === [6. 캘리브레이션 결과 계산 함수 (추가됨)] ===
         private void CalculateConstants()
         {
-            // 수평 각도 상수 계산 (20도 기준)
-            double diffRight = Math.Abs(val_Right - val_Center);
-            double diffLeft = Math.Abs(val_Left - val_Center);
-            double avgH = (diffRight + diffLeft) / 2.0;
+            // 1. 계산기에 측정된 5점 데이터 입력 (이때 내부적으로 상수 K, 진폭 등이 계산됨)
+            // 파라미터 순서: Center, Right, Left, Center(Vertical), Up, Down
+            // (GazeCalculator의 SetCalibrationData 함수 정의에 맞춰서 넣습니다)
+            // 보통 수평/수직 중앙값이 같으므로 val_Center를 두 번 넣습니다.
+            gazeCalc.SetCalibrationData(val_Center, val_Right, val_Left, val_Center, val_Up, val_Down);
 
-            // 0으로 나누기 방지
-            if (avgH > 0.001) K_Horz = 20.0 / avgH;
-
-            // 수직 각도 상수 계산 (20도 기준)
-            double diffUp = Math.Abs(val_Up - val_Center);
-            double diffDown = Math.Abs(val_Down - val_Center);
-            double avgV = (diffUp + diffDown) / 2.0;
-
-            if (avgV > 0.001) K_Vert = 20.0 / avgV;
-
-            MessageBox.Show($"캘리브레이션 완료!\n\n" +
-                            $"[측정값 평균]\n중앙: {val_Center:F2}\n우측: {val_Right:F2}, 좌측: {val_Left:F2}\n\n" +
-                            $"[계산된 상수 K]\n수평(Horz): {K_Horz:F3}\n수직(Vert): {K_Vert:F3}");
+            // 2. 메시지 박스는 확인용으로 띄우되, 이게 뜨면 코드가 잠시 멈출 수 있으니 
+            // 실제 사용 시에는 주석 처리하는 게 좋습니다.
+            // MessageBox.Show("캘리브레이션 완료! 이제 시선 추적을 시작합니다.");
+            
+            // (중요) 콘솔이나 디버그 창에만 살짝 남기기
+            System.Diagnostics.Debug.WriteLine("Calibration Finished & Set to GazeCalculator");
         }
     }
 }
