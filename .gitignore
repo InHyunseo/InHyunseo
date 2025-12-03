@@ -2,7 +2,7 @@ venvs/
 __pycache__/
 *.pyc
 *.pt
-
+*.vs
 # --- C/C++ Build Files ---
 *.exe
 *.o
