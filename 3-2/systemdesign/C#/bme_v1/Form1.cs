@@ -287,11 +287,11 @@ namespace WindowsFormsApp1
                             {
                                 try
                                 {
-                                    //double x = (filteredData - val_Center) * K_Horz; // 수평 각도
-                                    //double y = (filteredData2 - val_Center) * K_Vert; // 수직 각도
+                                    double x = (filteredData - val_Center) * K_Horz; // 수평 각도
+                                    double y = (filteredData2 - val_Center) * K_Vert; // 수직 각도
 
-                                    double x = 10.5; //연결 확인을 위함
-                                    double y = -3.3;
+                                    //double x = 10.5; //연결 확인을 위함
+                                    //double y = -3.3;
 
                                     string msg = $"{x:F2}, {y:F2}\n"; // 소수점 둘째 자리까지 포맷팅
                                     byte[] dataToSend = Encoding.UTF8.GetBytes(msg);
@@ -329,7 +329,7 @@ namespace WindowsFormsApp1
             {
                 // 1. 아까 만든 변수(client)에 실제 연결 객체를 생성해서 저장(할당)합니다.
                 // "내 컴퓨터(127.0.0.1)의 5000번 포트로 연결해라"
-                client = new TcpClient("127.0.0.1", 5000);
+                client = new TcpClient("192.168.10.5", 5000);
                 
                 // 2. 아까 만든 변수(stream)에 데이터 통로를 저장합니다.
                 stream = client.GetStream();
