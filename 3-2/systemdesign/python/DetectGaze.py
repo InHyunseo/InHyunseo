@@ -7,52 +7,41 @@ import socket
 import os
 from ultralytics import YOLO
 
-# [NEW] gTTS 및 오디오 재생용 라이브러리
-try:
-    from gtts import gTTS
-    import pygame
-except ImportError:
-    print("❌ 필수 라이브러리가 없습니다. 설치해주세요: pip install gTTS pygame")
+from gtts import gTTS
+import pygame
 
-# --- [설정값] 사용자 환경에 맞춰 조절하세요 ---
+# --- My recieving server (All)---
 HOST = '0.0.0.0'
 PORT = 5000
 
-# 카메라 해상도
+# 카메라 해상도 (C#에서 각도를 기반으로 좌표를 게산해서 넘겨주기 때문에 맞춰줘야함)
 CAM_WIDTH = 640
 CAM_HEIGHT = 480
 
-# ★ [중요] 각도 -> 픽셀 변환 감도 (Gain)
-PIXELS_PER_DEGREE_X = 18.0 
-PIXELS_PER_DEGREE_Y = 18.0
+# For gTTs flags, dwelling time settings
+Dwelling_Threshold = 1.5 # 1.5초
+dwell_target_name = None
+dwell_time_start = 0.0
+dwell_triggered = False 
 
 # YOLO 설정
-CONFIDENCE_THRESHOLD = 0.6
+CONFIDENCE_THRESHOLD = 0.5
 GREEN = (0, 255, 0)
 WHITE = (255, 255, 255)
 RED = (0, 0, 255)
-
+YELLOW = (0, 255, 255)
+BLACK = (0, 0, 0)
 # 라벨 오버레이 상태
 LAST_LABEL_MSG = None
 LAST_LABEL_TIME = 0.0
 LABEL_MSG_DURATION = 1.5
 
 # TTS 설정
-# gTTS는 인터넷 통신을 하므로 쿨다운을 좀 더 넉넉히 주는 게 좋습니다.
 TTS_COOLDOWN = 3.0  
 tts_queue = queue.Queue()
 last_spoken = {"msg": None, "t": 0.0}
 
-# 한글 라벨 매핑
-KO_LABELS = {
-    "person":"사람", "car":"자동차", "bus":"버스", "truck":"트럭", "bicycle":"자전거",
-    "motorcycle":"오토바이", "dog":"강아지", "cat":"고양이", "chair":"의자",
-    "bottle":"병", "cup":"컵", "cell phone":"휴대폰", "laptop":"노트북", "book":"책",
-    "keyboard":"키보드", "mouse":"마우스", "monitor":"모니터", "tv":"텔레비전"
-}
 
-def to_korean(name: str) -> str:
-    return KO_LABELS.get(name, name)
 
 def label_at_gaze(yolo_results, gx, gy, class_names):
     """ 시선점(gx, gy)이 포함된 박스 중 신뢰도가 가장 높은 라벨 반환 """
@@ -85,7 +74,7 @@ eog_gaze_lock = threading.Lock()
 
 is_running = True
 
-# --- 1. [수정됨] gTTS 스레드 ---
+# --- 1. gTTS 스레드 ---
 def tts_thread_func():
     # pygame 믹서 초기화 (오디오 재생용)
     try:
@@ -105,7 +94,7 @@ def tts_thread_func():
                 print(f"🔊 생성 중... : {msg}")
                 
                 # 1. 구글 서버에서 음성 파일 생성 (lang='ko' 한국어)
-                tts = gTTS(text=msg, lang='ko', slow=False)
+                tts = gTTS(text=msg, lang='en', slow=False)
                 
                 # 2. 임시 파일로 저장
                 filename = "temp_voice.mp3"
@@ -178,11 +167,8 @@ def tcp_eog_thread_func():
                     if ',' in line:
                         try:
                             parts = line.split(',')
-                            angle_x = float(parts[0])
-                            angle_y = float(parts[1])
-                            
-                            px = int(CAM_WIDTH / 2 + (angle_x * PIXELS_PER_DEGREE_X))
-                            py = int(CAM_HEIGHT / 2 - (angle_y * PIXELS_PER_DEGREE_Y))
+                            px = int(float(parts[0]))
+                            py = int(float(parts[1]))
                             
                             px = max(0, min(CAM_WIDTH, px))
                             py = max(0, min(CAM_HEIGHT, py))
@@ -204,6 +190,20 @@ def tcp_eog_thread_func():
         except: pass
         print("TCP 서버 종료")
 
+# --- 4. 시각화 (Dwell Progress) ---
+def draw_dwell_ui(img, center, progress, triggered):
+    radius = 20
+    # 배경
+    cv2.circle(img, center, radius, (200, 200, 200), 2)
+    if triggered:
+        # 완료 시 초록색 채움
+        cv2.circle(img, center, radius, GREEN, -1)
+    elif progress > 0:
+        # 진행 중 노란색 호
+        end_angle = -90 + (360 * progress)
+        cv2.ellipse(img, center, (radius, radius), 0, -90, end_angle, YELLOW, 4)
+
+
 # --- 메인 스레드 ---
 if __name__ == "__main__":
     model = YOLO('yolov8n.pt')
@@ -220,7 +220,7 @@ if __name__ == "__main__":
     
     print("\n" + "="*40)
     print(" [시스템 시작] C# 연결 후 캘리브레이션을 진행하세요.")
-    print(" - 'g' 키: 현재 시선에 있는 물체 읽기 (gTTS)")
+    print(f" {Dwelling_Threshold}초 동안 머문 시선에 있는 물체 읽기")
     print(" - 'q' 키: 프로그램 종료")
     print("="*40 + "\n")
 
@@ -245,11 +245,11 @@ if __name__ == "__main__":
                     
                     xmin, ymin, xmax, ymax = map(int, data[:4])
                     cls_id = int(data[5])
-                    label = to_korean(model.names[cls_id])
+                    label = model.names[cls_id]
                     
                     cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), GREEN, 2)
                     cv2.putText(frame, f"{label} {conf:.2f}", (xmin, ymin-5), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, GREEN, 2)
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, BLACK, 2)
 
             # 2. 시선(EOG) 그리기
             with eog_gaze_lock:
@@ -259,32 +259,61 @@ if __name__ == "__main__":
             cv2.line(frame, (gx, gy-10), (gx, gy+10), RED, 2)
             cv2.circle(frame, (gx, gy), 8, RED, 2)
 
-            # 3. 상태 메시지
-            if LAST_LABEL_MSG and (time.time() - LAST_LABEL_TIME) < LABEL_MSG_DURATION:
-                cv2.putText(frame, LAST_LABEL_MSG, (20, 50), 
-                            cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 255, 255), 2)
+            # 3. 상태 메시지 표시 안할 거임
+            #if LAST_LABEL_MSG and (time.time() - LAST_LABEL_TIME) < LABEL_MSG_DURATION:
+            #    cv2.putText(frame, LAST_LABEL_MSG, (20, 50) 
+            #                cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 255, 255), 2)
 
-            cv2.imshow('Eye Tracking AI', frame)
+            cv2.imshow('User point of view', frame)
+
+            # --- [수정된 부분] 3. Dwell Time 로직 (키 입력 제거, 자동 인식) ---
+            
+            # 현재 시선에 있는 물체 확인
+            current_obj, _ = label_at_gaze(current_results, gx, gy, model.names)
+            
+            progress = 0.0 # 시각화용 진행률
+
+            if current_obj:
+                # 1. 보고 있던 물체를 계속 보는 경우
+                if current_obj == dwell_target_name:
+                    # 경과 시간 계산
+                    elapsed = time.time() - dwell_time_start
+                    
+                    # 진행률 계산 (0.0 ~ 1.0)
+                    progress = min(elapsed / Dwelling_Threshold, 1.0)
+                    
+                    # 시간이 다 찼고 + 아직 말을 안 했다면? -> TTS 실행
+                    if elapsed >= Dwelling_Threshold and not dwell_triggered:
+                        print(f"👀 인식 완료: {current_obj}")
+                        tts_queue.put(current_obj)
+                        dwell_triggered = True # 중복 실행 방지
+                
+                # 2. 새로운 물체로 시선 이동
+                else:
+                    dwell_target_name = current_obj
+                    dwell_time_start = time.time()
+                    dwell_triggered = False
+                    progress = 0.0
+            
+            else:
+                # 3. 허공을 보는 경우 (초기화)
+                dwell_target_name = None
+                dwell_time_start = 0
+                dwell_triggered = False
+                progress = 0.0
+
+            # 4. 시각화 (십자선 + Dwell 게이지)
+            cv2.line(frame, (gx-10, gy), (gx+10, gy), RED, 2)
+            cv2.line(frame, (gx, gy-10), (gx, gy+10), RED, 2)
+            
+            # Dwell 게이지 그리기 (노란색 링)
+            draw_dwell_ui(frame, (gx, gy), progress, dwell_triggered)
+
+            cv2.imshow('User point of view', frame)
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
                 break
-            elif key == ord('g'):
-                name, conf = label_at_gaze(current_results, gx, gy, model.names)
-                if name:
-                    k_name = to_korean(name)
-                    msg = f"시선 감지: {k_name}"
-                    
-                    now = time.time()
-                    if k_name != last_spoken["msg"] or (now - last_spoken["t"]) > TTS_COOLDOWN:
-                        tts_queue.put(k_name) 
-                        last_spoken = {"msg": k_name, "t": now}
-                else:
-                    msg = "감지된 물체 없음"
-                
-                print(f"👀 {msg}")
-                LAST_LABEL_MSG = msg
-                LAST_LABEL_TIME = time.time()
 
     except KeyboardInterrupt:
         pass

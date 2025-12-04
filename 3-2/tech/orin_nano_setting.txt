@@ -1,0 +1,54 @@
+sudo dpkg --configure -a #패키지 확인 및 재설치
+
+sudo snap install chromium
+
+cd ~/Downloads
+# 파일 다운로드한 폴더로 이동
+
+sudo apt install ./code_1.106.3-1764110883_arm64.deb
+# sudo apt install 명령으로 설치파일 실행 window apt? Yes
+
+# 파이썬 pip 설치하기
+sudo apt update
+sudo apt install python3-pip
+
+#jtop 설치하기
+sudo pip3 install -U jetson-stats
+
+#재부팅
+sudo reboot
+
+#가상환경 설치
+sudo apt install python3-venv
+
+#각종 문법
+cd ~/ #폴더 이동
+python3 -m venv 가상환경이름 # 가상환경 만들기
+source 가상환경이름/bin/activate # 활성화
+
+#requirement 설치, 3.10 버전이고 requirement는 3.12버전 기준이라 수동 설치 필요함
+pip install "opencv-python==4.9.0.80"
+pip install "numpy==1.26.4"
+pip install mediapipe "numpy<2.0"
+pip install mediapipe==0.10.14
+
+# cpuinfo 라이브러리 최신화
+pip install --upgrade py-cpuinfo# cpuinfo 라이브러리 최신화
+
+# camera 드라이버 설치
+sudo /opt/nvidia/jetson-io/jetson-io.py
+
+Configure Jetson 24pin CSI Connector 선택
+Configure for compatible hardware 선택
+IMX219 선택 (-A: cam0, - C: cam1)
+
+# 카메라 연결  확인
+nvgstcapture-1.0
+
+#git 연동
+
+# 1. 이름 등록 (본인 닉네임이나 영어 이름)
+git config --global user.name "Hyunseo" 
+
+# 2. 이메일 등록 (GitHub 가입할 때 쓴 이메일 권장)
+git config --global user.email "your_email@example.com"
