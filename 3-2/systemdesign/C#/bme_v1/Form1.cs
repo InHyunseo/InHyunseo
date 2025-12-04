@@ -305,7 +305,7 @@ namespace WindowsFormsApp1
         {
             try
             {
-                client = new TcpClient("192.168.165.70", 5000);
+                client = new TcpClient("xxx", 5000);
                 stream = client.GetStream();
                 isConnected = true;
                 MessageBox.Show("Python 서버와 연결 성공!");
