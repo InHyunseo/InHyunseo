@@ -224,7 +224,7 @@ with mp_pose.Pose(
                     bottom_enter_time = now
 
                 # 현재 프레임은 여기까지 그리고 다음 프레임으로
-                cv2.imshow('Squat Tracker', cv2.flip(image, 1))
+                cv2.imshow('Squat Tracker')
                 if cv2.waitKey(5) & 0xFF == 27:
                     break
                 continue
@@ -350,8 +350,7 @@ with mp_pose.Pose(
                         (30, 40),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
-        # 보기 편하도록 좌우 반전
-        cv2.imshow('Squat Tracker', cv2.flip(image, 1))
+        cv2.imshow('Squat Tracker')
         if cv2.waitKey(5) & 0xFF == 27:
             break
 
