@@ -82,6 +82,6 @@
 ## 📈 Github Stats
 
 <div align="center">
-  <img src="https://github-readme-stats.vercel.app/api?username=InHyunseo&show_icons=true&theme=radical&bg_color=0d1117&text_color=c9d1d9&icon_color=58a6ff" height="180px">
+  <img src="https://github-readme-stats.vercel.app/api?username=Hyunseo_In&show_icons=true&theme=radical&bg_color=0d1117&text_color=c9d1d9&icon_color=58a6ff" height="180px">
   <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=InHyunseo&layout=compact&theme=radical&bg_color=0d1117&text_color=c9d1d9" height="180px">
 </div>
