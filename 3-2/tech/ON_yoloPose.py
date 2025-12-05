@@ -91,6 +91,76 @@ class MpPoseShim:
     """ mp_pose 모듈을 흉내내는 클래스 """
     PoseLandmark = YoloIndices
 
+def draw_ghost_squat(frame, keypoints, idx_map, hip_center_x, hip_center_y, alpha=0.6):
+    """
+    사용자의 신체 사이즈를 기반으로 '이상적인 스쿼트 자세(Ghost)'를 오버레이합니다.
+    frame: 원본 이미지
+    keypoints: 현재 사용자의 키포인트 좌표
+    idx_map: 인덱스 매핑 (YoloIndices)
+    hip_center: 사용자의 엉덩이 중심 좌표 (기준점)
+    alpha: 투명도 (0.0 ~ 1.0)
+    """
+    overlay = frame.copy()
+    
+    # 1. 신체 사이즈 측정 (현재 사용자의 픽셀 단위 길이 계산)
+    # 오른쪽 다리 기준으로 길이 측정 (측면 뷰 가정)
+    r_hip = keypoints[idx_map.RIGHT_HIP][:2]
+    r_knee = keypoints[idx_map.RIGHT_KNEE][:2]
+    r_ankle = keypoints[idx_map.RIGHT_ANKLE][:2]
+    r_shoulder = keypoints[idx_map.RIGHT_SHOULDER][:2]
+
+    # 허벅지 길이 (Hip -> Knee)
+    thigh_len = np.linalg.norm(r_hip - r_knee)
+    # 정강이 길이 (Knee -> Ankle)
+    shin_len = np.linalg.norm(r_knee - r_ankle)
+    # 몸통 길이 (Shoulder -> Hip)
+    torso_len = np.linalg.norm(r_shoulder - r_hip)
+
+    # 2. 이상적인 스쿼트 좌표 계산 (Side View 기준)
+    # 기준점: 사용자의 현재 엉덩이 위치 (hip_center_x, hip_center_y)
+    
+    # [Ghost] 무릎 위치: 엉덩이에서 앞으로 뻗어나감 (이상적인 깊이)
+    # 스쿼트 정석: 허벅지가 바닥과 수평(0도) 또는 살짝 아래
+    ghost_knee_x = hip_center_x + thigh_len  # 측면이니까 앞으로(X축 증가)
+    ghost_knee_y = hip_center_y              # 수평이니까 Y축 동일 (조금 내리려면 + 값)
+
+    # [Ghost] 발목 위치: 무릎에서 수직으로 아래로
+    # 스쿼트 정석: 정강이는 바닥과 수직에 가깝거나 발목이 무릎보다 뒤에 있지 않음
+    ghost_ankle_x = ghost_knee_x - (shin_len * 0.2) # 무릎보다 살짝 뒤 (자연스러운 각도)
+    ghost_ankle_y = ghost_knee_y + shin_len
+
+    # [Ghost] 어깨 위치: 엉덩이 위로 꼿꼿하게 (허리 펴기)
+    # 상체 각도: 앞으로 너무 숙이지 않게 (약 60~70도 유지)
+    lean_forward = torso_len * 0.3 # 상체가 앞으로 약간 기우는 정도
+    ghost_shoulder_x = hip_center_x + lean_forward 
+    ghost_shoulder_y = hip_center_y - (torso_len * 0.9) # 위로 올라감
+
+    # 3. 그리기 (반투명 선)
+    # 좌표들을 정수형(int)으로 변환
+    pt_hip = (int(hip_center_x), int(hip_center_y))
+    pt_knee = (int(ghost_knee_x), int(ghost_knee_y))
+    pt_ankle = (int(ghost_ankle_x), int(ghost_ankle_y))
+    pt_shoulder = (int(ghost_shoulder_x), int(ghost_shoulder_y))
+
+    # Ghost 색상 (형광 녹색)
+    ghost_color = (0, 255, 0) 
+    thickness = 5
+
+    # 몸통 (Hip -> Shoulder)
+    cv2.line(overlay, pt_hip, pt_shoulder, ghost_color, thickness)
+    # 허벅지 (Hip -> Knee)
+    cv2.line(overlay, pt_hip, pt_knee, ghost_color, thickness)
+    # 정강이 (Knee -> Ankle)
+    cv2.line(overlay, pt_knee, pt_ankle, ghost_color, thickness)
+
+    # 관절 포인트
+    cv2.circle(overlay, pt_knee, 8, (255, 255, 255), -1)
+    cv2.circle(overlay, pt_shoulder, 8, (255, 255, 255), -1)
+
+    # 4. 이미지 합성 (투명도 적용)
+    cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+
+
 # ==========================================
 # 3. 메인 실행 코드 (멀티 유저 지원)
 # ==========================================
@@ -176,6 +246,21 @@ def main():
                 # 엉덩이 좌표를 기준으로 텍스트 표시
                 hip_x = int(keypoints[idx_map.RIGHT_HIP][0])
                 hip_y = int(keypoints[idx_map.RIGHT_HIP][1])
+
+                # [추가됨] Ghost Overlay 로직
+                # 사용자가 운동 중이거나 'down' 상태일 때 가이드를 보여줍니다.
+                if user_data[track_id]['stage'] == 'down':
+                     draw_ghost_squat(
+                        annotated_frame, 
+                        keypoints, 
+                        idx_map, 
+                        hip_x, hip_y, 
+                        alpha=0.5 # 50% 투명도
+                    )
+                     
+                     # 텍스트 피드백 추가
+                     cv2.putText(annotated_frame, "Follow the Green Line!", (hip_x - 50, hip_y - 80),
+                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
                 info_text = f"ID:{track_id} CNT:{user_data[track_id]['count']}"
                 
