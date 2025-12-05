@@ -58,19 +58,21 @@ def gstreamer_pipeline(sensor_id=0, capture_width=1280, capture_height=720, disp
         % (sensor_id, capture_width, capture_height, framerate, flip_method, display_width, display_height)
     )
 
+from enum import IntEnum  # <--- [중요] 이거 추가!
+
 # ==========================================
-# 2. YOLO -> Mediapipe 변환 어댑터 (핵심!)
+# 2. YOLO -> Mediapipe 변환 어댑터 (수정됨)
 # ==========================================
 class LandmarkShim:
     """ Mediapipe의 landmark 객체(.x, .y, .z)를 흉내내는 클래스 """
     def __init__(self, x, y, z=0.0):
         self.x = x
         self.y = y
-        self.z = z # YOLO는 기본적으로 Z가 없으므로 0으로 처리 (2D 각도 계산됨)
+        self.z = z
 
-class YoloIndices:
-    """ YOLO의 Keypoint 인덱스를 Mediapipe 이름으로 매핑 (COCO 포맷 기준) """
-    # YOLO (COCO) Index Mapping
+# [수정] 일반 class 대신 IntEnum을 상속받도록 변경
+# 이렇게 하면 정수(int)처럼 배열 인덱싱도 되고, .value 속성도 가집니다.
+class YoloIndices(IntEnum):
     NOSE = 0
     LEFT_SHOULDER = 5
     RIGHT_SHOULDER = 6
