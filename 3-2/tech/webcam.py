@@ -1,38 +1,30 @@
 import cv2
 
-# CSI 카메라는 이 함수를 통해서 열어야 화질이 좋고 안 끊깁니다.
-def gstreamer_pipeline(
-    sensor_id=0,
-    capture_width=1280,
-    capture_height=720,
-    display_width=1280,
-    display_height=720,
-    framerate=30,
-    flip_method=0,
-):
-    return (
-        "nvarguscamerasrc sensor-id=%d ! "
-        "video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, framerate=(fraction)%d/1 ! "
-        "nvvidconv flip-method=%d ! "
-        "video/x-raw, width=(int)%d, height=(int)%d, format=(string)BGRx ! "
-        "videoconvert ! "
-        "video/x-raw, format=(string)BGR ! appsink"
-        % (
-            sensor_id,
-            capture_width,
-            capture_height,
-            framerate,
-            flip_method,
-            display_width,
-            display_height,
-        )
-    )
+# 가장 기초적인 파이프라인 (해상도, FPS 자동)
+pipeline = (
+    "nvarguscamerasrc ! "
+    "video/x-raw(memory:NVMM), width=1280, height=720, format=NV12, framerate=30/1 ! "
+    "nvvidconv ! "
+    "video/x-raw, format=BGRx ! "
+    "videoconvert ! "
+    "video/x-raw, format=BGR ! appsink"
+)
 
-# 사용법: 숫자 대신 함수를 호출해서 넣습니다.
-print(gstreamer_pipeline(sensor_id=0)) # 파이프라인 문자열 확인용
-cap = cv2.VideoCapture(gstreamer_pipeline(sensor_id=0), cv2.CAP_GSTREAMER)
+print(f"GStreamer 지원 여부: {cv2.getBuildInformation().find('GStreamer: YES') != -1}")
+print("카메라 여는 중...")
+
+cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
 
 if cap.isOpened():
-    print("CSI 카메라가 잘 열렸습니다!")
+    print("✅ 카메라 성공! (창이 뜹니다)")
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        cv2.imshow("Camera Test", frame)
+        if cv2.waitKey(1) & 0xFF == 27: # ESC로 종료
+            break
+    cap.release()
+    cv2.destroyAllWindows()
 else:
-    print("카메라를 열 수 없습니다. 선이 잘 꼽혔는지 확인하세요.")
+    print("❌ 실패... (Daemon 재시작 하셨나요?)")
