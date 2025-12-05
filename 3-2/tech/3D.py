@@ -1,4 +1,5 @@
 import cv2
+print(cv2.getBuildInformation())
 import mediapipe as mp
 import numpy as np
 import time
