@@ -92,41 +92,52 @@ class MpPoseShim:
 # ==========================================
 # 3. 메인 실행 코드
 # ==========================================
+# ==========================================
+# 3. 메인 실행 코드 (수정됨)
+# ==========================================
 def main():
-    # 모델 로드 (처음 실행시 다운로드됨)
+    # 모델 로드
     print("Loading YOLO model...")
     model = YOLO('yolov8n-pose.pt') 
     
     # GStreamer 파이프라인으로 카메라 열기
+    # (아까 성공했던 그 파이프라인 설정 그대로 사용)
     cap = cv2.VideoCapture(gstreamer_pipeline(flip_method=0), cv2.CAP_GSTREAMER)
 
     if not cap.isOpened():
         print("Camera open failed!")
         return
 
-    mp_pose_shim = MpPoseShim() # 기존 함수에 넘겨줄 가짜 mp_pose 객체
+    mp_pose_shim = MpPoseShim() # 가짜 객체 생성
+
+    print("✅ Start Inference... (Press ESC to exit)")
 
     while True:
         ret, frame = cap.read()
         if not ret:
+            print("Frame read failed")
             break
 
-        # YOLO Inference (verbose=False로 로그 줄임)
+        # YOLO Inference
+        # stream=True를 쓰면 메모리 관리에 더 유리합니다.
         results = model.predict(frame, verbose=False, conf=0.5)
 
-        # 사람이 감지되었는지 확인
-        if results[0].keypoints is not None and results[0].keypoints.shape[1] > 0:
-            # 첫 번째 사람의 키포인트만 가져옴 (17개 포인트)
-            # data shape: (1, 17, 3) -> [x, y, conf] or [x, y] depending on version
+        # ------------------------------------------------------
+        # [수정 1] 사람이 진짜로 감지되었는지 안전하게 확인하는 조건문
+        # ------------------------------------------------------
+        # keypoints.data.shape[0]이 0보다 커야 사람이 있는 것입니다.
+        if (results[0].keypoints is not None and 
+            results[0].keypoints.data.shape[0] > 0):
+            
+            # 첫 번째 사람(Index 0)의 키포인트 가져오기
+            # shape: (17, 3) -> [x, y, conf]
             keypoints = results[0].keypoints.data[0].cpu().numpy()
 
-            # YOLO 결과를 Mediapipe 포맷(List of objects)으로 변환
-            # YOLO Keypoint는 0~16번까지 있음.
-            # 하지만 Mediapipe 인덱스는 33번까지 있으므로, 안전하게 33개짜리 배열을 만들고 채워넣음
+            # YOLO 결과를 Mediapipe 포맷으로 변환
             world_lms_shim = [LandmarkShim(0, 0, 0)] * 33
             
-            # 매핑된 중요 포인트만 업데이트
             idx_map = YoloIndices
+            # 필요한 관절들 매핑
             target_indices = [
                 idx_map.LEFT_SHOULDER, idx_map.RIGHT_SHOULDER,
                 idx_map.LEFT_HIP, idx_map.RIGHT_HIP,
@@ -135,26 +146,29 @@ def main():
             ]
 
             for idx in target_indices:
-                # keypoints[idx] = [x, y, confidence] (픽셀 좌표)
                 x, y = keypoints[idx][0], keypoints[idx][1]
-                # z는 0으로 둠 (2D 평면 각도로 계산하게 됨)
                 world_lms_shim[idx] = LandmarkShim(x, y, 0.0)
 
-            # --- 기존 로직 호출 ---
+            # 각도 계산
             hip_angle = get_hip_angle_3d(world_lms_shim, mp_pose_shim)
             knee_angle = get_knee_angle_3d(world_lms_shim, mp_pose_shim)
 
-            # 시각화 (YOLO 내장 plot 사용하거나 직접 그림)
+            # 시각화 (YOLO가 그려준 뼈대 이미지 가져오기)
             annotated_frame = results[0].plot()
             
-            # 정보 표시
+            # ------------------------------------------------------
+            # [수정 2] putText 중첩 에러 해결 (따로따로 써야 함)
+            # ------------------------------------------------------
             cv2.putText(annotated_frame, f"Hip: {hip_angle:.1f}", (30, 50), 
-                        cv2.putText(annotated_frame, f"Knee: {knee_angle:.1f}", (30, 100),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2))
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            
+            cv2.putText(annotated_frame, f"Knee: {knee_angle:.1f}", (30, 100),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             
             cv2.imshow("YOLO Pose Squat", annotated_frame)
 
         else:
+            # 사람이 없으면 그냥 원본 카메라 화면 보여줌
             cv2.imshow("YOLO Pose Squat", frame)
 
         if cv2.waitKey(1) & 0xFF == 27:
