@@ -92,83 +92,101 @@ class MpPoseShim:
     PoseLandmark = YoloIndices
 
 # ==========================================
-# 3. 메인 실행 코드 (수정됨)
+# 3. 메인 실행 코드 (멀티 유저 지원)
 # ==========================================
 def main():
-    # 모델 로드
     print("Loading YOLO model...")
     model = YOLO('yolov8n-pose.pt') 
     
-    # GStreamer 파이프라인으로 카메라 열기
-    # (아까 성공했던 그 파이프라인 설정 그대로 사용)
     cap = cv2.VideoCapture(gstreamer_pipeline(flip_method=0), cv2.CAP_GSTREAMER)
-
     if not cap.isOpened():
         print("Camera open failed!")
         return
 
-    mp_pose_shim = MpPoseShim() # 가짜 객체 생성
+    mp_pose_shim = MpPoseShim()
 
-    print("✅ Start Inference... (Press ESC to exit)")
+    # --- [멀티 유저 데이터 저장소] ---
+    # ID를 키(Key)로 사용하여 각 사람의 상태를 따로 관리합니다.
+    # 예: { 1: {'count': 0, 'stage': 'up'}, 2: {'count': 5, 'stage': 'down'} }
+    user_data = {}
+
+    STAND_THRESH = 160
+    SQUAT_THRESH = 90
+
+    print("✅ Multi-Person Squat Counter Started...")
 
     while True:
         ret, frame = cap.read()
-        if not ret:
-            print("Frame read failed")
-            break
+        if not ret: break
 
-        # YOLO Inference
-        # stream=True를 쓰면 메모리 관리에 더 유리합니다.
-        results = model.predict(frame, verbose=False, conf=0.5)
+        # [핵심 변경 1] predict -> track (persist=True 필수)
+        # persist=True: 이전 프레임의 사람 ID를 기억해서 다음 프레임에도 유지함
+        results = model.track(frame, persist=True, verbose=False, conf=0.5)
 
-        # ------------------------------------------------------
-        # [수정 1] 사람이 진짜로 감지되었는지 안전하게 확인하는 조건문
-        # ------------------------------------------------------
-        # keypoints.data.shape[0]이 0보다 커야 사람이 있는 것입니다.
-        if (results[0].keypoints is not None and 
-            results[0].keypoints.data.shape[0] > 0):
-            
-            # 첫 번째 사람(Index 0)의 키포인트 가져오기
-            # shape: (17, 3) -> [x, y, conf]
-            keypoints = results[0].keypoints.data[0].cpu().numpy()
+        if results[0].keypoints is not None and results[0].boxes.id is not None:
+            # 감지된 모든 사람의 데이터를 가져옵니다.
+            # boxes.id: 트래킹 ID 목록 (예: [1.0, 2.0])
+            # keypoints.data: 관절 좌표 목록
+            track_ids = results[0].boxes.id.int().cpu().tolist()
+            keypoints_list = results[0].keypoints.data.cpu().numpy()
 
-            # YOLO 결과를 Mediapipe 포맷으로 변환
-            world_lms_shim = [LandmarkShim(0, 0, 0)] * 33
-            
-            idx_map = YoloIndices
-            # 필요한 관절들 매핑
-            target_indices = [
-                idx_map.LEFT_SHOULDER, idx_map.RIGHT_SHOULDER,
-                idx_map.LEFT_HIP, idx_map.RIGHT_HIP,
-                idx_map.LEFT_KNEE, idx_map.RIGHT_KNEE,
-                idx_map.LEFT_ANKLE, idx_map.RIGHT_ANKLE
-            ]
-
-            for idx in target_indices:
-                x, y = keypoints[idx][0], keypoints[idx][1]
-                world_lms_shim[idx] = LandmarkShim(x, y, 0.0)
-
-            # 각도 계산
-            hip_angle = get_hip_angle_3d(world_lms_shim, mp_pose_shim)
-            knee_angle = get_knee_angle_3d(world_lms_shim, mp_pose_shim)
-
-            # 시각화 (YOLO가 그려준 뼈대 이미지 가져오기)
+            # 시각화용 이미지
             annotated_frame = results[0].plot()
-            
-            # ------------------------------------------------------
-            # [수정 2] putText 중첩 에러 해결 (따로따로 써야 함)
-            # ------------------------------------------------------
-            cv2.putText(annotated_frame, f"Hip: {hip_angle:.1f}", (30, 50), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            
-            cv2.putText(annotated_frame, f"Knee: {knee_angle:.1f}", (30, 100),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            
-            cv2.imshow("YOLO Pose Squat", annotated_frame)
 
+            # 감지된 각 사람에 대해 반복문 실행
+            for track_id, keypoints in zip(track_ids, keypoints_list):
+                
+                # 처음 보는 ID라면 데이터 초기화
+                if track_id not in user_data:
+                    user_data[track_id] = {'count': 0, 'stage': 'up', 'color': np.random.randint(0, 255, 3).tolist()}
+
+                # --- 1. 좌표 변환 (기존 로직) ---
+                world_lms_shim = [LandmarkShim(0, 0, 0)] * 33
+                idx_map = YoloIndices
+                target_indices = [
+                    idx_map.LEFT_SHOULDER, idx_map.RIGHT_SHOULDER,
+                    idx_map.LEFT_HIP, idx_map.RIGHT_HIP,
+                    idx_map.LEFT_KNEE, idx_map.RIGHT_KNEE,
+                    idx_map.LEFT_ANKLE, idx_map.RIGHT_ANKLE
+                ]
+                
+                # 현재 사람의 좌표 추출
+                for idx in target_indices:
+                    x, y = keypoints[idx][0], keypoints[idx][1]
+                    world_lms_shim[idx] = LandmarkShim(x, y, 0.0)
+
+                # --- 2. 각도 계산 ---
+                hip_angle = get_hip_angle_3d(world_lms_shim, mp_pose_shim)
+
+                # --- 3. 개별 카운팅 로직 ---
+                curr_stage = user_data[track_id]['stage']
+                
+                if hip_angle > STAND_THRESH:
+                    user_data[track_id]['stage'] = "up"
+                
+                if hip_angle < SQUAT_THRESH and curr_stage == "up":
+                    user_data[track_id]['stage'] = "down"
+                
+                if hip_angle > STAND_THRESH and curr_stage == "down":
+                    user_data[track_id]['stage'] = "up"
+                    user_data[track_id]['count'] += 1
+                    print(f"User {track_id}: Count {user_data[track_id]['count']}")
+
+                # --- 4. 개별 시각화 (머리 위에 정보 띄우기) ---
+                # 엉덩이 좌표를 기준으로 텍스트 표시
+                hip_x = int(keypoints[idx_map.RIGHT_HIP][0])
+                hip_y = int(keypoints[idx_map.RIGHT_HIP][1])
+
+                info_text = f"ID:{track_id} CNT:{user_data[track_id]['count']}"
+                
+                # 텍스트 배경 박스
+                cv2.rectangle(annotated_frame, (hip_x - 10, hip_y - 40), (hip_x + 150, hip_y), user_data[track_id]['color'], -1)
+                cv2.putText(annotated_frame, info_text, (hip_x, hip_y - 10), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+            cv2.imshow("Multi-Person Squat", annotated_frame)
         else:
-            # 사람이 없으면 그냥 원본 카메라 화면 보여줌
-            cv2.imshow("YOLO Pose Squat", frame)
+            cv2.imshow("Multi-Person Squat", frame)
 
         if cv2.waitKey(1) & 0xFF == 27:
             break
