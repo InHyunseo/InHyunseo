@@ -3,12 +3,13 @@ import time
 import numpy as np
 from ultralytics import YOLO
 import torch
+from enum import IntEnum
 # ==========================================
-# 1. 기존 헬퍼 함수 (그대로 유지)
+# 1. helper functions
 # ==========================================
 def calc_angle_3d(a, b, c):
     """
-    3D 상에서 점 b를 중심으로, a-b-c 세 점이 이루는 각도(도 단위)
+    Calculate the angle (in degrees) formed by three points a-b-c in 3D space, with b as the vertex.
     """
     pa = np.array([a.x, a.y, a.z])
     pb = np.array([b.x, b.y, b.z])
@@ -23,7 +24,7 @@ def calc_angle_3d(a, b, c):
     return np.degrees(np.arccos(cosang))
 
 def get_hip_angle_3d(world_lms, mp_pose_shim):
-    # mp_pose 대신 아래에서 만든 Shim(가짜 객체)을 사용합니다.
+    # for link with mediapipe functions (I made this first for mediapipe)
     IDX_R_SH = mp_pose_shim.PoseLandmark.RIGHT_SHOULDER.value
     IDX_L_SH = mp_pose_shim.PoseLandmark.LEFT_SHOULDER.value
     IDX_R_HP = mp_pose_shim.PoseLandmark.RIGHT_HIP.value
@@ -58,7 +59,6 @@ def gstreamer_pipeline(sensor_id=0, capture_width=1280, capture_height=720, disp
         % (sensor_id, capture_width, capture_height, framerate, flip_method, display_width, display_height)
     )
 
-from enum import IntEnum  # <--- [중요] 이거 추가!
 
 # ==========================================
 # 2. YOLO -> Mediapipe 변환 어댑터 (수정됨)

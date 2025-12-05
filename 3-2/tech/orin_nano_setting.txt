@@ -64,3 +64,5 @@ pip3 uninstall -y opencv-python opencv-contrib-python
 # Check
 python3 -c "import torch; import cv2; print(f'GPU: {torch.cuda.is_available()}')
 python3 import cv2 version
+
+# You should manually install opencv, pytorch, torchvision for cuda, jetson orin nano.
