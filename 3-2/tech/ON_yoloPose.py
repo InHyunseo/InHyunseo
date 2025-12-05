@@ -3,7 +3,6 @@ import time
 import numpy as np
 from ultralytics import YOLO
 import torch
-print(torch.cuda.is_available())
 # ==========================================
 # 1. 기존 헬퍼 함수 (그대로 유지)
 # ==========================================
