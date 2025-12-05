@@ -57,29 +57,9 @@ git config --global user.email "your_email@example.com"
 pip3 uninstall -y opencv-python opencv-contrib-python opencv-python-headless torch torchvision ultralytics
 pip3 install --no-cache-dir torch torchvision --index-url https://pypi.jetson-ai-lab.io/jp6/cu126
 pip3 install ultralytics
-# Ultralytics가 멋대로 깐 깡통 OpenCV 다시 삭제
+# OpenCV 다시 삭제
 pip3 uninstall -y opencv-python opencv-contrib-python
 
 # Check
-python3 -c "import torch; import cv2; print(f'GPU: {torch.cuda.is_available()}'); print(f'Camera: {cv2.getBuildInformation().find(\"GStreamer: YES\") != -1}')"
-
-
-GST_ARGUS: Running with following settings:
-   Camera index = 0 
-   Camera mode  = 4 
-   Output Stream W = 1280 H = 720 
-   seconds to Run    = 0 
-   Frame Rate = 59.999999 
-GST_ARGUS: Setup Complete, Starting captures for 0 seconds
-GST_ARGUS: Starting repeat capture requests.
-CONSUMER: Producer has connected; continuing.
-[ WARN:0] global ./modules/videoio/src/cap_gstreamer.cpp (1100) open OpenCV | GStreamer warning: Cannot query video position: status=0, value=-1, duration=-1
-Traceback (most recent call last):
-  File "/home/hyunseo/Desktop/github/3-2/tech/ON_yoloPose.py", line 168, in <module>
-    main()
-  File "/home/hyunseo/Desktop/github/3-2/tech/ON_yoloPose.py", line 122, in main
-    keypoints = results[0].keypoints.data[0].cpu().numpy()
-IndexError: index 0 is out of bounds for dimension 0 with size 0
-GST_ARGUS: Cleaning up
-CONSUMER: Done Success
-GST_ARGUS: Done Success
+python3 -c "import torch; import cv2; print(f'GPU: {torch.cuda.is_available()}')
+python3 import cv2 version
