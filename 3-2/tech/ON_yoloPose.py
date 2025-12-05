@@ -247,27 +247,27 @@ def main():
                 hip_x = int(keypoints[idx_map.RIGHT_HIP][0])
                 hip_y = int(keypoints[idx_map.RIGHT_HIP][1])
 
-                # [추가됨] Ghost Overlay 로직
-                # 사용자가 운동 중이거나 'down' 상태일 때 가이드를 보여줍니다.
-                if user_data[track_id]['stage'] == 'down':
+                # [수정된 부분 1] 고스트 오버레이 조건 변경
+                # 기존: if user_data[track_id]['stage'] == 'down': (너무 늦게 뜸)
+                # 변경: 서 있는 각도(160도)보다 조금이라도 굽히면 바로 표시
+                if hip_angle < 165: 
                      draw_ghost_squat(
-                        annotated_frame, 
-                        keypoints, 
-                        idx_map, 
-                        hip_x, hip_y, 
-                        alpha=0.5 # 50% 투명도
+                        annotated_frame, keypoints, idx_map, hip_x, hip_y, 
+                        alpha=0.5
                     )
-                     
-                     # 텍스트 피드백 추가
-                     cv2.putText(annotated_frame, "Follow the Green Line!", (hip_x - 50, hip_y - 80),
+                     # 가이드 문구
+                     cv2.putText(annotated_frame, "Match Green Line!", (hip_x - 60, hip_y - 80),
                                  cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
+                # [수정된 부분 2] 텍스트 가독성 개선
                 info_text = f"ID:{track_id} CNT:{user_data[track_id]['count']}"
                 
-                # 텍스트 배경 박스
+                # 배경 박스 (랜덤 컬러)
                 cv2.rectangle(annotated_frame, (hip_x - 10, hip_y - 40), (hip_x + 150, hip_y), user_data[track_id]['color'], -1)
+                
+                # 글씨 색을 검은색(0, 0, 0)으로 변경 -> 흰색 박스에서도 잘 보임!
                 cv2.putText(annotated_frame, info_text, (hip_x, hip_y - 10), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)  # <--- 여기가 변경됨
 
             cv2.imshow("Multi-Person Squat", annotated_frame)
         else:
