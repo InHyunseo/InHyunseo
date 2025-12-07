@@ -5,7 +5,6 @@ import numpy as np
 from ultralytics import YOLO
 from enum import IntEnum
 import math
-
 # ==========================================
 # 1. Yolo config & mapping
 # ==========================================
@@ -173,7 +172,7 @@ class GhostSystem:
 def main():
     print("Loading YOLO model...")
     # Jetson에서는 engine 파일 사용 권장 ('yolov8n-pose.engine')
-    model = YOLO('yolov8n-pose.pt') 
+    model = YOLO('yolov8n-pose.engine') 
 
     try:
         # GStreamer 파이프라인 시도

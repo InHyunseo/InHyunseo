@@ -2,6 +2,8 @@ venvs/
 __pycache__/
 *.pyc
 *.pt
+*.engine
+*.onnx
 *.vs
 # --- C/C++ Build Files ---
 *.exe
