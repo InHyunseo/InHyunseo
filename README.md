@@ -12,11 +12,7 @@
 
 ## 🧑‍💻 About Me
 
-**"생체 신호에서 로봇 제어까지, 하드웨어와 소프트웨어를 아우르는 엔지니어"**
-
-안녕하세요 저는 **한양대학교**에서 **바이오메디컬공학**을 주전공으로, **미래자동차공학**을 부전공하고 있는 3학년 학부생 인현서입니다.
-
-코드 작성을 넘어, **센서/회로 설계부터 임베디드 시스템, 그리고 자율주행 알고리즘**까지 전체 파이프라인을 직접 구현하는 것을 즐깁니다. 현재는 생체 신경망(Connectome)의 효율성 증명과 자율주행 및 로보틱스 통합 제어 시스템, 멀티 에이전트 시스템에 깊은 관심을 가지고 있습니다.
+**"Hi, I am In Hyunseo"**
 
 * 🔭 **Current Focus:** Multi-Robot Exploration (ROS2/Gazebo), Neuromorphic Computing (Connectome), Embedded AI (Jetson Orin)
 * 🌱 **Learning:** Advanced Path Planning (A*, RRT), SLAM, RL based Control
