@@ -19,7 +19,7 @@ namespace WindowsFormsApp1
         private double rotation_comp_V = 0; // 수직 움직임 시 수평 간섭 비율
 
         // [특허 적용] 데드존 (이 값 이하의 변화는 무시 -> 드리프트 방지)
-        private double deadZone = 0.5; // 전압 기준 (실험적으로 조절 필요)
+        private double deadZone = 0.05; // 전압 기준 (실험적으로 조절 필요)
 
         public bool IsCalibrated { get; private set; } = false;
 
@@ -95,25 +95,29 @@ namespace WindowsFormsApp1
         {
             if (!IsCalibrated) return new System.Drawing.Point(camWidth / 2, camHeight / 2);
 
-            // 1. 카메라 화각을 이용해 1도당 몇 픽셀인지 계산
-            // 전체 폭(Width) = 전체 화각(FOV)이라고 가정 (선형 근사)
-            // 좀 더 정밀하게 하려면 Tan를 써야 하지만, -30~30도 범위에선 선형도 괜찮습니다.
-            double pixelsPerDegreeX = camWidth / camFOV;
-            double pixelsPerDegreeY = camHeight / (camFOV * (double)camHeight / camWidth); // 종횡비 반영
+            // [수정 1] 민감도(Sensitivity) 계수 추가
+            // 눈을 20도만 돌려도 화면 끝까지 가도록 1.5배~2.0배 증폭
+            double sensitivity = 2.0; 
 
-            // 2. 각도 -> 픽셀 변환
-            // (중앙이 0도이므로, 각도만큼 픽셀을 더하거나 뺍니다)
+            // 1. 각도 -> 픽셀 변환
+            double pixelsPerDegreeX = (camWidth / camFOV) * sensitivity;
+            double pixelsPerDegreeY = (camHeight / (camFOV * (double)camHeight / camWidth)) * sensitivity;
+
+            // 2. 좌표 계산
             int pixX = (int)(angleH * pixelsPerDegreeX);
             int pixY = (int)(angleV * pixelsPerDegreeY);
 
-            // 3. 카메라 좌표계로 변환 (좌상단이 0,0)
             int centerX = camWidth / 2;
             int centerY = camHeight / 2;
 
             int finalX = centerX + pixX;
-            int finalY = centerY - pixY; // EOG 위쪽(+)은 픽셀에선 위쪽(-)
+            int finalY = centerY - pixY;
 
-            // 화면 밖으로 나가지 않게 제한 (Clamping)
+            // 3. 디버깅용: 콘솔에 현재 계산된 값 출력 (매우 중요!)
+            // 좌표가 이상하면 이 로그를 봐야 합니다.
+            Console.WriteLine($"AngleH: {angleH:F2}, FinalX: {finalX}");
+
+            // 화면 밖으로 나가지 않게 제한
             finalX = Math.Max(0, Math.Min(camWidth, finalX));
             finalY = Math.Max(0, Math.Min(camHeight, finalY));
 

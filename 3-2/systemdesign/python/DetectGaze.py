@@ -281,12 +281,28 @@ if __name__ == "__main__":
                     
                     # 진행률 계산 (0.0 ~ 1.0)
                     progress = min(elapsed / Dwelling_Threshold, 1.0)
-                    
-                    # 시간이 다 찼고 + 아직 말을 안 했다면? -> TTS 실행
+
+                    # 시간이 다 찼고 + 아직 이번 턴에 처리를 안 했다면?
                     if elapsed >= Dwelling_Threshold and not dwell_triggered:
-                        print(f"👀 인식 완료: {current_obj}")
-                        tts_queue.put(current_obj)
-                        dwell_triggered = True # 중복 실행 방지
+                        
+                        # [추가된 로직] 쿨다운 체크
+                        # "지금 인식된 물체가 방금 말한 물체와 다르거나" 또는 "마지막으로 말한 지 3초가 지났으면" 실행
+                        current_time = time.time()
+                        if (current_obj != last_spoken["msg"]) or \
+                           ((current_time - last_spoken["t"]) > TTS_COOLDOWN):
+                            
+                            print(f"👀 인식 완료 및 출력: {current_obj}")
+                            tts_queue.put(current_obj)
+                            
+                            # 마지막으로 말한 정보 갱신
+                            last_spoken["msg"] = current_obj
+                            last_spoken["t"] = current_time
+                        
+                        else:
+                            print(f"🔇 인식은 됐지만 최근에 말해서 생략함: {current_obj}")
+
+                        # 소리를 냈든 안 냈든, 이 물체를 계속 보고 있는 상태에서는 다시 진입 금지
+                        dwell_triggered = True
                 
                 # 2. 새로운 물체로 시선 이동
                 else:

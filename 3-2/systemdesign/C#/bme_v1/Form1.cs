@@ -7,8 +7,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.IO.Ports; // 시리얼 통신
-using System.Net.Sockets; // TCP 통신
+using System.IO.Ports;
+using System.Net.Sockets;
 
 namespace WindowsFormsApp1
 {
@@ -28,31 +28,26 @@ namespace WindowsFormsApp1
         int data_count = 0;
         int Data_1, Data_2, Data_3;
 
-        // === [캘리브레이션 관련 변수] ===
+        // === [1. 워밍업 관련 변수 (초기 튀는 현상 방지)] ===
+        int stable_count = 0;
+        const int WARMUP_SAMPLES = 200; // 처음 200개 데이터는 버림
+
+        // === [2. 캘리브레이션 관련 변수] ===
         CalibState currentCalibState = CalibState.None;
-        List<double> tempCalibBuffer = new List<double>();
-        double val_Center, val_Right, val_Left, val_Up, val_Down;
 
-        // === [수직 신호 증폭 배수 (Gain)] ===
-        // 1.5배 유지 (노이즈와 신호 크기 균형)
-        private const double V_GAIN = 1.5;
+        // ★★★ [수정 핵심] 버퍼와 중앙값을 가로/세로 분리! ★★★
+        List<double> tempCalibBuffer_H = new List<double>();
+        List<double> tempCalibBuffer_V = new List<double>();
 
-        // === [수정됨 1] 노이즈 제거 필터 설정 (반응 속도 개선) ===
-        // 100은 너무 둔해서(0.2초 지연), 40(0.08초 지연)으로 줄였습니다.
-        // 이제 그래프가 훨씬 빠릿빠릿하게 따라올 겁니다.
-        private const int FILTER_SIZE = 40; 
-        private Queue<double> qFilter_H = new Queue<double>(); // 수평 노이즈 제거용
-        private Queue<double> qFilter_V = new Queue<double>(); // 수직 노이즈 제거용
+        double val_Center_H, val_Center_V; // 중앙값도 H/V 따로 저장
+        double val_Right, val_Left, val_Up, val_Down;
 
-        // === [수정됨 2] 데드존 미세 조정 ===
-        // 반응이 빨라진 만큼 데드존을 살짝 조여서 떨림을 잡습니다.
-        private const double DEADZONE_H = 3.0; // 수평 유지
-        private const double DEADZONE_V = 5.0; // 수직은 8.0 -> 5.0으로 조금 더 민감하게 변경
+        // 최종 계산될 각도 변환 상수 (K)
+        double K_Horz = 0;
+        double K_Vert = 0;
 
-        // 필터링 및 계산 객체
-        private EOGprocess eogFilter = new EOGprocess(); 
+        private EOGprocess eogFilter = new EOGprocess();
         private EOGprocess eogFilter2 = new EOGprocess();
-        private GazeCalculator gazeCalc = new GazeCalculator(); 
 
         string thisdate = DateTime.Now.ToString("yyMMdd");
 
@@ -61,17 +56,29 @@ namespace WindowsFormsApp1
         private NetworkStream stream;
         private bool isConnected = false;
 
+        // 수직 게인 (필요시 조정)
+        private const double V_GAIN = 1.0;
+
         public Form1()
         {
             InitializeComponent();
         }
 
-        // [이동 평균 필터 함수]
-        private double GetFilteredData(Queue<double> q, double rawData)
+        private void maskedTextBox1_MaskInputRejected(object sender, MaskInputRejectedEventArgs e) { }
+        private void groupBox1_Enter(object sender, EventArgs e) { }
+        private void label1_Click(object sender, EventArgs e) { }
+
+        private void Form1_FormClosed(object sender, FormClosedEventArgs e)
         {
-            q.Enqueue(rawData);
-            if (q.Count > FILTER_SIZE) q.Dequeue();
-            return q.Average();
+            if (null != sPort)
+            {
+                if (sPort.IsOpen)
+                {
+                    sPort.Close();
+                    sPort.Dispose();
+                    sPort = null;
+                }
+            }
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -91,23 +98,7 @@ namespace WindowsFormsApp1
             CheckForIllegalCrossThreadCalls = false;
             txtDate.Text = thisdate;
 
-            // [그래프 축 고정]
-            try
-            {
-                scope1.Channels[0].Axis.AutoScaling = false; 
-                scope1.Channels[0].Axis.Min = -2000; 
-                scope1.Channels[0].Axis.Max = 2000;
-                
-                if (scope1.Channels.Count > 1)
-                {
-                    scope1.Channels[1].Axis.AutoScaling = false;
-                    scope1.Channels[1].Axis.Min = -2000;
-                    scope1.Channels[1].Axis.Max = 2000;
-                }
-            }
-            catch { /* Scope 속성이 다를 경우 무시 */ }
-
-            ConnectToPythonServer(); 
+            ConnectToPythonServer();
         }
 
         private void BtnOpen_Click(object sender, EventArgs e)
@@ -118,6 +109,7 @@ namespace WindowsFormsApp1
                 {
                     sPort = new SerialPort();
                     sPort.DataReceived += new SerialDataReceivedEventHandler(SPort_DataReceived);
+
                     sPort.PortName = cboPortName.SelectedItem.ToString();
                     sPort.BaudRate = Convert.ToInt32(txtBaudRate.Text);
                     sPort.DataBits = (int)8;
@@ -128,47 +120,68 @@ namespace WindowsFormsApp1
 
                 if (sPort.IsOpen)
                 {
-                    // 변수 초기화
+                    // 1. 변수 초기화
+                    K_Horz = 0; K_Vert = 0;
                     currentCalibState = CalibState.None;
-                    val_Center = 0; val_Right = 0; val_Left = 0; val_Up = 0; val_Down = 0;
-                    
-                    qFilter_H.Clear();
-                    qFilter_V.Clear();
 
-                    // 캘리브레이션 창 생성
+                    // 값 초기화 (H, V 분리됨)
+                    val_Center_H = 0; val_Center_V = 0;
+                    val_Right = 0; val_Left = 0; val_Up = 0; val_Down = 0;
+                    stable_count = 0; // 워밍업 카운트 리셋
+
+                    // 2. 캘리브레이션 창 생성
                     calibration calibForm = new calibration();
 
+                    // [이벤트 연결 1] 측정 시작
                     calibForm.OnMeasureStart += (state) =>
                     {
-                        if (state == CalibState.Finish) CalculateConstants();
+                        if (state == CalibState.Finish)
+                        {
+                            CalculateConstants();
+                        }
                         else
                         {
                             currentCalibState = state;
-                            tempCalibBuffer.Clear();
+                            // 버퍼 2개 모두 비우기
+                            tempCalibBuffer_H.Clear();
+                            tempCalibBuffer_V.Clear();
                         }
                     };
 
+                    // [이벤트 연결 2] 측정 멈춤 (값 저장 로직)
                     calibForm.OnMeasureStop += () =>
                     {
-                        if (tempCalibBuffer.Count > 0)
+                        // 데이터가 있다면 평균 계산
+                        if (tempCalibBuffer_H.Count > 0 && tempCalibBuffer_V.Count > 0)
                         {
-                            double avg = tempCalibBuffer.Average();
+                            double avgH = tempCalibBuffer_H.Average();
+                            double avgV = tempCalibBuffer_V.Average();
+
                             switch (currentCalibState)
                             {
-                                case CalibState.Center: val_Center = avg; break;
-                                case CalibState.Right: val_Right = avg; break;
-                                case CalibState.Left: val_Left = avg; break;
-                                case CalibState.Up: val_Up = avg; break;
-                                case CalibState.Down: val_Down = avg; break;
+                                case CalibState.Center:
+                                    // ★★★ 핵심: Center일 때 가로/세로 기준을 각각 저장 ★★★
+                                    val_Center_H = avgH;
+                                    val_Center_V = avgV;
+                                    break;
+                                case CalibState.Right: val_Right = avgH; break;
+                                case CalibState.Left: val_Left = avgH; break;
+                                case CalibState.Up: val_Up = avgV; break;
+                                case CalibState.Down: val_Down = avgV; break;
                             }
                         }
                         currentCalibState = CalibState.None;
                     };
 
-                    calibForm.ShowDialog(); 
+                    calibForm.ShowDialog();
 
                     btnOpen.Enabled = false;
                     btnClose.Enabled = true;
+                }
+                else
+                {
+                    btnOpen.Enabled = true;
+                    btnClose.Enabled = false;
                 }
             }
             catch (System.Exception ex)
@@ -191,6 +204,8 @@ namespace WindowsFormsApp1
             btnOpen.Enabled = true;
             btnClose.Enabled = false;
         }
+
+        private void scope1_Click(object sender, EventArgs e) { }
 
         private void SPort_DataReceived(object sender, System.IO.Ports.SerialDataReceivedEventArgs e)
         {
@@ -220,63 +235,85 @@ namespace WindowsFormsApp1
                         Data_2 = ((data_buff[2] & 0x7F) << 7) + (data_buff[3] & 0x7F);
                         Data_3 = 0;
 
-                        // 1. 하드웨어/1차 필터
-                        double rawDataH = eogFilter.ProcessSample(Data_1);
-                        double rawDataV = eogFilter2.ProcessSample(Data_2);
+                        // ★ [디버깅용] 진짜 들어오는 값 확인 (필요시 주석 해제)
+                        // System.Diagnostics.Debug.WriteLine($"RAW -> H: {Data_1}, V: {Data_2}");
 
-                        // 2. 소프트웨어 이동 평균 필터 (노이즈 제거)
-                        double cleanH = GetFilteredData(qFilter_H, rawDataH);
-                        double cleanV = GetFilteredData(qFilter_V, rawDataV);
+                        double filteredData = eogFilter.ProcessSample(Data_1);
+                        double filteredData2 = eogFilter2.ProcessSample(Data_2);
 
-                        // =========================================================
-                        // [신호 반전 및 수직 증폭]
-                        // =========================================================
-                        cleanH = -cleanH;
-                        cleanV = -cleanV * V_GAIN; 
+                        // === [워밍업] 초반 데이터 200개 버리기 (그래프 튀는 현상 방지) ===
+                        if (stable_count < WARMUP_SAMPLES)
+                        {
+                            stable_count++;
+                            start_flag = 0; data_count = 0;
+                            continue; // 여기서 함수 끝냄 (그래프 안 그림)
+                        }
+
+                        // 수직 게인 적용 (필요시)
+                        filteredData2 = filteredData2 * V_GAIN;
+
+                        // ==========================================================
+                        // ★★★ [수정] 그래프 그리기를 조건문 밖으로 뺐습니다! ★★★
+                        // 이제 캘리브레이션 중에도 그래프가 멈추지 않고 움직입니다.
+                        // ==========================================================
+                        for (int i = 0; i < buffsize - 1; i++)
+                        {
+                            input_Data_1[i] = input_Data_1[i + 1];
+                            input_Data_2[i] = input_Data_2[i + 1];
+                        }
+                        input_Data_1[buffsize - 1] = filteredData;
+                        input_Data_2[buffsize - 1] = filteredData2;
+
+                        input_Draw_1 = input_Data_1;
+                        input_Draw_2 = input_Data_2;
+                        // ==========================================================
 
                         // --- [분기점] 캘리브레이션 중 vs 평상시 ---
                         if (currentCalibState != CalibState.None)
                         {
-                            if (currentCalibState == CalibState.Right || currentCalibState == CalibState.Left)
-                                tempCalibBuffer.Add(cleanH); 
-                            else if (currentCalibState == CalibState.Up || currentCalibState == CalibState.Down)
-                                tempCalibBuffer.Add(cleanV); 
-                            else if (currentCalibState == CalibState.Center)
-                                tempCalibBuffer.Add(cleanH);
+                            // [캘리브레이션 모드]
+                            // ★ 어떤 상태이든 H, V 데이터 둘 다 모아야 나중에 계산 가능
+                            tempCalibBuffer_H.Add(filteredData);
+                            tempCalibBuffer_V.Add(filteredData2);
                         }
                         else
                         {
-                            // [평상시 모드]
-                            Array.Copy(input_Data_1, 1, input_Data_1, 0, buffsize - 1);
-                            Array.Copy(input_Data_2, 1, input_Data_2, 0, buffsize - 1);
-                            
-                            input_Data_1[buffsize - 1] = cleanH;
-                            input_Data_2[buffsize - 1] = cleanV;
+                            // [SPort_DataReceived 함수 내부 맨 아래쪽]
 
-                            input_Draw_1 = input_Data_1;
-                            input_Draw_2 = input_Data_2;
-
-                            // TCP 전송 및 좌표 변환
-                            if (isConnected && stream != null && gazeCalc.IsCalibrated)
+                            // [평상시 모드] TCP 전송 및 좌표 변환 로직
+                            if (isConnected && stream != null)
                             {
                                 try
                                 {
-                                    double angleH, angleV;
-                                    
-                                    // 각도 계산
-                                    gazeCalc.CalculateGaze(cleanH, cleanV, out angleH, out angleV);
+                                    // 1. 각도 계산 (기존 로직)
+                                    double angleX = (filteredData - val_Center_H) * K_Horz; 
+                                    double angleY = (filteredData2 - val_Center_V) * K_Vert; 
 
-                                    // 데드존 적용
-                                    if (Math.Abs(angleH) < DEADZONE_H) angleH = 0;
-                                    if (Math.Abs(angleV) < DEADZONE_V) angleV = 0;
+                                    // 2. [추가된 기능] 드리프트 자동 보정 (중요!)
+                                    // 시선이 한쪽으로 쏠려 있으면, 중앙점(Center)을 아주 천천히 그쪽으로 이동시킵니다.
+                                    // EOG 신호가 시간이 지나면 흘러내리는 현상을 막아줍니다.
+                                    val_Center_H += (filteredData - val_Center_H) * 0.001; 
+                                    val_Center_V += (filteredData2 - val_Center_V) * 0.001;
 
-                                    // 좌표 변환 (640x480)
-                                    System.Drawing.Point pixel = gazeCalc.GetCameraCoordinates(angleH, angleV, 640, 480);
+                                    // 3. 각도 -> 픽셀 변환 (감도 조절)
+                                    // sensitivity 값을 키우면 눈을 조금만 움직여도 화면 끝까지 갑니다.
+                                    double sensitivity = 25.0; // (기존보다 더 높임: 18.0 -> 25.0)
 
-                                    // 전송
-                                    string msg = $"{pixel.X},{pixel.Y}\n";
+                                    // 화면 중앙(320, 240)을 기준으로 더하고 뺍니다.
+                                    int pixelX = 320 + (int)(angleX * sensitivity);
+                                    int pixelY = 240 - (int)(angleY * sensitivity); // Y축은 위가 (-)라서 뺌
+
+                                    // 4. 화면 밖으로 나가지 않게 가두기 (Clamping)
+                                    pixelX = Math.Max(0, Math.Min(640, pixelX));
+                                    pixelY = Math.Max(0, Math.Min(480, pixelY));
+
+                                    // 5. 전송 (좌표값)
+                                    string msg = $"{pixelX},{pixelY}\n";
                                     byte[] dataToSend = Encoding.UTF8.GetBytes(msg);
                                     stream.Write(dataToSend, 0, dataToSend.Length);
+                                    
+                                    // [디버깅] 값이 잘 나오는지 출력창에서 확인해보세요
+                                    // System.Diagnostics.Debug.WriteLine($"Send: {pixelX}, {pixelY}");
                                 }
                                 catch
                                 {
@@ -284,6 +321,7 @@ namespace WindowsFormsApp1
                                 }
                             }
                         }
+
                         start_flag = 0;
                         data_count = 0;
                     }
@@ -293,7 +331,6 @@ namespace WindowsFormsApp1
 
         private void On_timer1(object sender, EventArgs e)
         {
-            // 차트 그리기
             scope1.Channels[0].Data.SetYData(input_Data_1);
             if (scope1.Channels.Count > 1)
             {
@@ -305,7 +342,7 @@ namespace WindowsFormsApp1
         {
             try
             {
-                client = new TcpClient("xxx", 5000);
+                client = new TcpClient("10.146.99.70", 5000); // IP 확인 필요
                 stream = client.GetStream();
                 isConnected = true;
                 MessageBox.Show("Python 서버와 연결 성공!");
@@ -316,20 +353,28 @@ namespace WindowsFormsApp1
             }
         }
 
+        // === [6. 캘리브레이션 결과 계산 함수] ===
         private void CalculateConstants()
         {
-            // 수집된 clean값(증폭된 값)을 계산기에 설정
-            gazeCalc.SetCalibrationData(val_Center, val_Right, val_Left, val_Center, val_Up, val_Down);
-            System.Diagnostics.Debug.WriteLine("Calibration Finished & Set to GazeCalculator");
-        }
+            // 수평(H) 계산: val_Center_H 사용
+            double diffRight = Math.Abs(val_Right - val_Center_H);
+            double diffLeft = Math.Abs(val_Left - val_Center_H);
+            double avgH = (diffRight + diffLeft) / 2.0;
 
-        // --- 기타 이벤트 핸들러 ---
-        private void Form1_FormClosed(object sender, FormClosedEventArgs e) {
-            if (sPort != null && sPort.IsOpen) { sPort.Close(); sPort.Dispose(); sPort = null; }
+            if (avgH > 0.001) K_Horz = 20.0 / avgH;
+
+            // 수직(V) 계산: val_Center_V 사용 (이제 정확해짐!)
+            double diffUp = Math.Abs(val_Up - val_Center_V);
+            double diffDown = Math.Abs(val_Down - val_Center_V);
+            double avgV = (diffUp + diffDown) / 2.0;
+
+            if (avgV > 0.001) K_Vert = 20.0 / avgV;
+
+            MessageBox.Show($"캘리브레이션 완료!\n\n" +
+                            $"[측정값 평균]\n중앙(H,V): {val_Center_H:F0}, {val_Center_V:F0}\n" +
+                            $"우측: {val_Right:F0}, 좌측: {val_Left:F0}\n" +
+                            $"위: {val_Up:F0}, 아래: {val_Down:F0}\n\n" +
+                            $"[계산된 상수 K]\n수평(Horz): {K_Horz:F3}\n수직(Vert): {K_Vert:F3}");
         }
-        private void maskedTextBox1_MaskInputRejected(object sender, MaskInputRejectedEventArgs e) { }
-        private void groupBox1_Enter(object sender, EventArgs e) { }
-        private void label1_Click(object sender, EventArgs e) { }
-        private void scope1_Click(object sender, EventArgs e) { }
     }
 }
