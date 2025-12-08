@@ -208,7 +208,7 @@ def draw_dwell_ui(img, center, progress, triggered):
 if __name__ == "__main__":
     model = YOLO('yolov8n.pt')
     
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(1)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_HEIGHT)
 
