@@ -27,7 +27,6 @@ dwell_triggered = False
 # YOLO 설정
 CONFIDENCE_THRESHOLD = 0.5
 GREEN = (0, 255, 0)
-WHITE = (255, 255, 255)
 RED = (0, 0, 255)
 YELLOW = (0, 255, 255)
 BLACK = (0, 0, 0)
@@ -258,13 +257,6 @@ if __name__ == "__main__":
             cv2.line(frame, (gx-10, gy), (gx+10, gy), RED, 2)
             cv2.line(frame, (gx, gy-10), (gx, gy+10), RED, 2)
             cv2.circle(frame, (gx, gy), 8, RED, 2)
-
-            # 3. 상태 메시지 표시 안할 거임
-            #if LAST_LABEL_MSG and (time.time() - LAST_LABEL_TIME) < LABEL_MSG_DURATION:
-            #    cv2.putText(frame, LAST_LABEL_MSG, (20, 50) 
-            #                cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 255, 255), 2)
-
-            cv2.imshow('User point of view', frame)
 
             # --- [수정된 부분] 3. Dwell Time 로직 (키 입력 제거, 자동 인식) ---
             
