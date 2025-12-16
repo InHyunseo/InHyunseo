@@ -10,15 +10,10 @@ using System.Windows.Forms;
 
 namespace WindowsFormsApp1
 {
-    public enum CalibState { None, Center, Right, Left, Up, Down, Finish }
+    //public enum CalibState { None, Center, Right, Left, Up, Down, Finish }
     public partial class calibration : Form
     {
-        // -------------------------------------------------------------
-        // [1] 여기가 중요합니다! 타이머 변수 선언
-        // -------------------------------------------------------------
         System.Windows.Forms.Timer seqTimer = new System.Windows.Forms.Timer();
-
-        // 시간 카운트용 변수
         int timeTicks = 0;
         public event Action<CalibState> OnMeasureStart; // "측정 시작해!"
         public event Action OnMeasureStop;              // "측정 멈춰!"
@@ -31,10 +26,11 @@ namespace WindowsFormsApp1
         public calibration()
         {
             InitializeComponent();
-            // 폼 디자인 코드 (디자인 탭에서 해도 됨)
             this.FormBorderStyle = FormBorderStyle.None;
             this.WindowState = FormWindowState.Maximized; // 전체 화면
             this.BackColor = Color.White;
+            this.KeyPreview = true;
+            this.KeyDown += new KeyEventHandler(calibration_KeyDown);
 
             // 점(Dot) 동적 생성 (도구상자에서 Panel 안 만들었으면 이 코드 사용)
             if (this.Controls["dotPanel"] == null)
@@ -60,15 +56,12 @@ namespace WindowsFormsApp1
 
             if (dot != null)
             {
-                // === [핵심] 사각형을 원으로 깎는 마법의 코드 ===
                 System.Drawing.Drawing2D.GraphicsPath path = new System.Drawing.Drawing2D.GraphicsPath();
                 path.AddEllipse(0, 0, dot.Width, dot.Height);
                 dot.Region = new Region(path);
-                // ===========================================
             }
 
             // === [2. 화면 크기에 따른 좌표 자동 계산] ===
-            // 현재 꽉 찬 화면(this.Width, Height)을 기준으로 중앙을 잡습니다.
             cx = this.Width / 2;
             cy = this.Height / 2;
 
@@ -84,55 +77,79 @@ namespace WindowsFormsApp1
             timeTicks = 0;
             seqTimer.Start();
         }
+        // calibration.cs 내부 SeqTimer_Tick 함수 수정 제안
 
+        // [핵심 로직 수정] 순서: 중앙 -> 위 -> 아래 -> 우 -> 좌
         private void SeqTimer_Tick(object sender, EventArgs e)
         {
             timeTicks++;
             int t = timeTicks; // 1 = 0.1초
+            
+            if (t == 1) MoveDot(cx, cy); // 중앙 위치
+            if (t == 4) OnMeasureStart?.Invoke(CalibState.Center);
+            if (t == 14) OnMeasureStop?.Invoke();
 
-            // === 시나리오 (총 23초) ===
+            // =======================================================
+            // 2. 위쪽 (Up) - 10도
+            // =======================================================
+            if (t == 51) MoveDot(cx, cy - gap_y); // 위로 이동
+            if (t == 54) OnMeasureStart?.Invoke(CalibState.Up);
+            if (t == 64) OnMeasureStop?.Invoke();
 
-            // 1. 중앙 (0~5초)
-            if (t == 1) MoveDot(cx, cy);
-            if (t == 45) OnMeasureStart?.Invoke(CalibState.Center);
-            if (t == 50) OnMeasureStop?.Invoke();
-
-            // 2. 우측 (5~7초) -> gap_x 사용
-            if (t == 51) MoveDot(cx + gap_x, cy);
-            if (t == 65) OnMeasureStart?.Invoke(CalibState.Right);
-            if (t == 70) OnMeasureStop?.Invoke();
-
-            // 3. 중앙 (7~9초)
             if (t == 71) MoveDot(cx, cy);
 
-            // 4. 좌측 (9~11초) -> cx - gap_x
-            if (t == 91) MoveDot(cx - gap_x, cy);
-            if (t == 105) OnMeasureStart?.Invoke(CalibState.Left);
-            if (t == 110) OnMeasureStop?.Invoke();
 
-            // 5. 중앙 (11~13초)
-            if (t == 111) MoveDot(cx, cy);
+            // =======================================================
+            // 3. 아래쪽 (Down) - 10도
+            // =======================================================
+            if (t == 121) MoveDot(cx, cy + gap_y); // 아래로 이동
+            if (t == 124) OnMeasureStart?.Invoke(CalibState.Down);
+            if (t == 134) OnMeasureStop?.Invoke();
 
-            // 6. 위 (13~15초) -> cy - gap_y (화면 위쪽이 y가 작음)
-            if (t == 131) MoveDot(cx, cy - gap_y);
-            if (t == 145) OnMeasureStart?.Invoke(CalibState.Up);
-            if (t == 150) OnMeasureStop?.Invoke();
+            if (t==141) MoveDot(cx, cy);
 
-            // 7. 중앙 (15~17초)
-            if (t == 151) MoveDot(cx, cy);
+            // =======================================================
+            // 4. 우측 (Right) - 20도
+            // =======================================================
+            if (t == 191) MoveDot(cx + gap_x, cy); // 우측 이동
+            if (t == 194) OnMeasureStart?.Invoke(CalibState.Right);
+            if (t == 204) OnMeasureStop?.Invoke();
 
-            // 8. 아래 (17~19초) -> cy + gap_y
-            if (t == 171) MoveDot(cx, cy + gap_y);
-            if (t == 185) OnMeasureStart?.Invoke(CalibState.Down);
-            if (t == 190) OnMeasureStop?.Invoke();
+            if (t == 211) MoveDot(cx, cy);
 
-            // 9. 종료 (21초)
-            if (t == 191) MoveDot(cx, cy);
-            if (t == 210)
+
+            // =======================================================
+            // 5. 좌측 (Left) - 20도
+            // =======================================================
+            if (t == 261) MoveDot(cx - gap_x, cy); // 좌측 이동
+            if (t == 264) OnMeasureStart?.Invoke(CalibState.Left);
+            if (t == 274) OnMeasureStop?.Invoke();
+
+            // =======================================================
+            // 6. 종료 (Finish)
+            // =======================================================
+            if (t == 281) MoveDot(cx, cy); // 중앙 복귀
+            if (t == 291)
             {
                 seqTimer.Stop();
-                OnMeasureStart?.Invoke(CalibState.Finish); // 끝났다고 알림
+                OnMeasureStart?.Invoke(CalibState.Finish);
                 this.Close();
+            }
+        }
+
+        private void calibration_Load_1(object sender, EventArgs e)
+        {
+
+        }
+
+        private void calibration_KeyDown(object sender, KeyEventArgs e)
+        {
+            // ESC 키가 눌렸을 때 실행
+            if (e.KeyCode == Keys.Escape)
+            {
+                seqTimer.Stop(); 
+                OnMeasureStop?.Invoke(); 
+                this.Close(); 
             }
         }
 
@@ -145,6 +162,5 @@ namespace WindowsFormsApp1
                 dot.Location = new Point(x - dot.Width / 2, y - dot.Height / 2);
             }
         }
-
     }
 }

@@ -14,12 +14,12 @@ import pygame
 HOST = '0.0.0.0'
 PORT = 5000
 
-# 카메라 해상도 (C#에서 각도를 기반으로 좌표를 게산해서 넘겨주기 때문에 맞춰줘야함)
+# 카메라 해상도 (C#에서 각도를 기반으로 좌표를 계산해서 넘겨주기 때문에 맞춰줘야함)
 CAM_WIDTH = 640
 CAM_HEIGHT = 480
 
 # For gTTs flags, dwelling time settings
-Dwelling_Threshold = 1.5 # 1.5초
+Dwelling_Threshold = 1.0 # 1.0초
 dwell_target_name = None
 dwell_time_start = 0.0
 dwell_triggered = False 
@@ -116,7 +116,7 @@ def tts_thread_func():
             print(f"[TTS 오류] {e}")
             # 인터넷 연결 문제일 수 있음
 
-# --- 2. YOLO 스레드 ---
+# --- 2. YOLO 스레드 ---q
 def yolo_thread_func(yolo_model):
     global latest_frame, latest_yolo_results, is_running
     print("YOLO 모델 가동 중...")
@@ -134,7 +134,7 @@ def yolo_thread_func(yolo_model):
         
         time.sleep(0.01)
 
-# --- 3. TCP 시선 데이터 수신 스레드 ---
+# --- 3. TCP 시선 데이터 수신 스레드 ---q
 def tcp_eog_thread_func():
     global latest_eog_gaze_data, is_running
     

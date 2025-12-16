@@ -12,16 +12,30 @@ using System.Net.Sockets;
 
 namespace WindowsFormsApp1
 {
+    // 캘리브레이션 상태 (프로젝트에 맞게 필요하면 항목 추가/수정)
+    public enum CalibState
+    {
+        None = 0,
+        Center,
+        Up,
+        Down,
+        Left,
+        Right,
+        Finish
+    }
+
     public partial class Form1 : Form
     {
-        bool isCalibrated = false;
-
+        private object calibLock = new object(); // 스레드 충돌 방지
         SerialPort sPort;
+
         int[] data_buff = new int[200];
         static int buffsize = 2000;
+
         double[] input_Data_1 = new double[buffsize];
         double[] input_Data_2 = new double[buffsize];
         double[] input_Data_3 = new double[buffsize];
+
         public double[] input_Draw_1 = new double[buffsize];
         public double[] input_Draw_2 = new double[buffsize];
         public double[] input_Draw_3 = new double[buffsize];
@@ -30,23 +44,27 @@ namespace WindowsFormsApp1
         int data_count = 0;
         int Data_1, Data_2, Data_3;
 
+        int debug_hz_count = 0;
+        DateTime last_debug_time = DateTime.Now;
+
         // === [1. 워밍업 관련 변수 (초기 튀는 현상 방지)] ===
         int stable_count = 0;
         const int WARMUP_SAMPLES = 200; // 처음 200개 데이터는 버림
 
         // === [2. 캘리브레이션 관련 변수] ===
+        bool isCalibrated = false;
         CalibState currentCalibState = CalibState.None;
 
-        // ★★★ [수정 핵심] 버퍼와 중앙값을 가로/세로 분리! ★★★
         List<double> tempCalibBuffer_H = new List<double>();
         List<double> tempCalibBuffer_V = new List<double>();
 
-        double val_Center_H, val_Center_V; // 중앙값도 H/V 따로 저장
+        double val_Center_H, val_Center_V;
         double val_Right, val_Left, val_Up, val_Down;
 
-        // 최종 계산될 각도 변환 상수 (K)
-        double K_Horz = 0;
-        double K_Vert = 0;
+        double K_Horz_Right = 0.1; // 오른쪽으로 갈 때의 민감도
+        double K_Horz_Left = 0.1;  // 왼쪽으로 갈 때의 민감도
+        double K_Vert_Up = 0.1;
+        double K_Vert_down = 0.1;
 
         private EOGprocess eogFilter = new EOGprocess();
         private EOGprocess eogFilter2 = new EOGprocess();
@@ -59,42 +77,66 @@ namespace WindowsFormsApp1
         private bool isConnected = false;
 
         // =========================================================
-        // [새로 추가] EOG 지능형 알고리즘 변수 (Delay & Floating Center)
+        // [EOG 지능형 알고리즘 변수 (Delay & Floating Center)]
         // =========================================================
-        
-        // 1. 버퍼 (0.4초 미래 데이터 확보용)
-        const int BUFF_SIZE = 25; 
+
+        // 500Hz 기준 0.4초 지연 = 200샘플
+        const int BUFF_SIZE = 100;
+
         List<double> smartBuff_H = new List<double>();
         List<double> smartBuff_V = new List<double>();
 
-        // 2. 화면 기준점 (Floating Center)
-        // 기존에는 320, 240 고정이었으나, 이제는 눈이 머무는 곳으로 계속 바뀝니다.
+        // 화면 기준점 (Floating Center)
         double screen_center_H = 320.0;
         double screen_center_V = 240.0;
 
-        // 3. 튜닝 파라미터 (블링크 및 응시 판단 기준)
-        const double THRESH_LEVEL = 40.0;        // 유의미한 이동 감지 레벨
-        const double THRESH_BLINK_SLOPE = -3.5;  // 블링크 급하강 기울기
-        const double THRESH_FIXATION_SLOPE = 1.5;// 응시(드리프트) 완만 기울기
+        // 튜닝 파라미터
+        const double THRESH_LEVEL = 100.0;
+        const double THRESH_BLINK_SLOPE = -10;
+        const double THRESH_FIXATION_SLOPE = 5;
 
-        // 4. 상태 관리 변수
-        int ignoreTimer = 0;      // 블링크 무시 타이머
+        // 화면 크기/타겟 각도 기반 감도
+        const int SCREEN_W = 640;
+        const int SCREEN_H = 480;
+        const double TARGET_ANGLE_H = 20.0; // 캘리브레이션에서 targetAngleH와 동일
+        const double TARGET_ANGLE_V = 10.0; // 캘리브레이션에서 targetAngleV와 동일
+
+        // 상태 변수
+        int ignoreTimer = 0;      // 블링크 무시 타이머(샘플 단위)
         double holdPixel_H = 320; // 고정된 좌표 저장용
         double holdPixel_V = 240;
-        // =========================================================
 
+        const double THRESH_BLINK_LEVEL = 350.0; // 블링크로 보는 V편차 임계값(튜닝: 250~500)
+        const double OUT_ALPHA = 0.25;
+        double outX = 320.0;
+        double outY = 240.0;
+        bool outInit = false;
 
+        // ---------------------------------------------------------
+
+        private static double Clamp(double v, double lo, double hi)
+            => Math.Max(lo, Math.Min(hi, v));
+
+        private double GetMedian(List<double> source)
+        {
+            if (source == null || source.Count == 0) return 0;
+            var sorted = source.OrderBy(x => x).ToList();
+            int mid = sorted.Count / 2;
+            return (sorted.Count % 2 != 0) ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2.0;
+        }
 
         public Form1()
         {
             InitializeComponent();
-            eogFilter.SetGain(1.0);  
-            eogFilter2.SetGain(5.0);
+            eogFilter.SetGain(2.0);
+            eogFilter2.SetGain(2.4);
         }
 
         private void maskedTextBox1_MaskInputRejected(object sender, MaskInputRejectedEventArgs e) { }
         private void groupBox1_Enter(object sender, EventArgs e) { }
         private void label1_Click(object sender, EventArgs e) { }
+        private void scope2_Click(object sender, EventArgs e) { }
+        private void scope1_Click(object sender, EventArgs e) { }
 
         private void Form1_FormClosed(object sender, FormClosedEventArgs e)
         {
@@ -121,7 +163,7 @@ namespace WindowsFormsApp1
             }
             cboPortName.EndUpdate();
 
-            cboPortName.SelectedItem = "COM4";
+            cboPortName.SelectedItem = "COM5";
             txtBaudRate.Text = "115200";
             CheckForIllegalCrossThreadCalls = false;
             txtDate.Text = thisdate;
@@ -140,7 +182,7 @@ namespace WindowsFormsApp1
 
                     sPort.PortName = cboPortName.SelectedItem.ToString();
                     sPort.BaudRate = Convert.ToInt32(txtBaudRate.Text);
-                    sPort.DataBits = (int)8;
+                    sPort.DataBits = 8;
                     sPort.Parity = Parity.None;
                     sPort.StopBits = StopBits.One;
                     sPort.Open();
@@ -148,86 +190,21 @@ namespace WindowsFormsApp1
 
                 if (sPort.IsOpen)
                 {
-                    // 1. 변수 초기화
-                    K_Horz = 0; K_Vert = 0;
+                    // 1) 변수 초기화
+                    K_Horz_Right = 0; K_Horz_Left = 0; K_Vert_Up = 0; K_Vert_down = 0;
                     currentCalibState = CalibState.None;
 
-                    // 값 초기화 (H, V 분리됨)
                     val_Center_H = 0; val_Center_V = 0;
                     val_Right = 0; val_Left = 0; val_Up = 0; val_Down = 0;
-                    stable_count = 0; // 워밍업 카운트 리셋
 
-                    // 2. 캘리브레이션 창 생성
-                    calibration calibForm = new calibration();
+                    stable_count = 0;
 
-                    calibForm.OnMeasureStart += (state) =>
-                    {
-                        if (state == CalibState.Finish)
-                        {
-                            CalculateConstants();
-                        }
-                        else
-                        {
-                            currentCalibState = state;
-                            // 버퍼 2개 모두 비우기
-                            tempCalibBuffer_H.Clear();
-                            tempCalibBuffer_V.Clear();
-
-                            // [추가] Center 상태가 시작될 때 로그 출력
-                            if (state == CalibState.Center)
-                            {
-                                System.Diagnostics.Debug.WriteLine("--- Calib: Center Start ---");
-                            }
-                        }
-                    };
-
-                    calibForm.OnMeasureStop += () =>
-                    {
-                        // 데이터가 충분히 모였는지 확인
-                        if (tempCalibBuffer_H.Count > 0 && tempCalibBuffer_V.Count > 0)
-                        {
-                            switch (currentCalibState)
-                            {
-                                case CalibState.Center:
-                                    // 1. Center: 수집된 데이터의 평균(Average)을 저장
-                                    val_Center_H = tempCalibBuffer_H.Average();
-                                    val_Center_V = tempCalibBuffer_V.Average();
-                                    break;
-
-                                case CalibState.Up:
-                                    // 위로 갈 때: 수직 신호의 최대값(Peak) 저장
-                                    val_Up = tempCalibBuffer_V.Max();
-                                    break;
-
-                                case CalibState.Down:
-                                    // 아래로 갈 때: 수직 신호의 최소값(Valley) 저장
-                                    val_Down = tempCalibBuffer_V.Min();
-                                    break;
-
-                                case CalibState.Right:
-                                    // 오른쪽 갈 때: 수평 신호의 최대값 저장
-                                    val_Right = tempCalibBuffer_H.Max();
-                                    break;
-
-                                case CalibState.Left:
-                                    // 왼쪽 갈 때: 수평 신호의 최소값 저장
-                                    val_Left = tempCalibBuffer_H.Min();
-                                    break;
-                            }
-                        }
-                        currentCalibState = CalibState.None;
-                    };
-                   
-                    calibForm.ShowDialog();
-
-                    btnOpen.Enabled = false;
-                    btnClose.Enabled = true;
+                    // 2) 캘리브레이션 실행
+                    RunCalibration();
                 }
-                else
-                {
-                    btnOpen.Enabled = true;
-                    btnClose.Enabled = false;
-                }
+
+                btnOpen.Enabled = false;
+                btnClose.Enabled = true;
             }
             catch (System.Exception ex)
             {
@@ -235,8 +212,64 @@ namespace WindowsFormsApp1
             }
         }
 
-        private void scope2_Click(object sender, EventArgs e)
-        { }
+        private void RunCalibration()
+        {
+            calibration calibForm = new calibration();
+
+            calibForm.OnMeasureStart += (state) =>
+            {
+                if (state == CalibState.Finish) CalculateConstants();
+                else
+                {
+                    currentCalibState = state;
+                    lock (calibLock)
+                    {
+                        tempCalibBuffer_H.Clear();
+                        tempCalibBuffer_V.Clear();
+                    }
+                }
+            };
+
+            calibForm.OnMeasureStop += () =>
+            {
+                lock (calibLock)
+                {
+                    if (tempCalibBuffer_H.Count > 0 && tempCalibBuffer_V.Count > 0)
+                    {
+                        double medH = GetMedian(tempCalibBuffer_H);
+                        double medV = GetMedian(tempCalibBuffer_V);
+
+                        switch (currentCalibState)
+                        {
+                            case CalibState.Center:
+                                val_Center_H = medH;
+                                val_Center_V = medV;
+                                break;
+
+                            case CalibState.Up:
+                                val_Up = medV;
+                                break;
+
+                            case CalibState.Down:
+                                val_Down = medV;
+                                break;
+
+                            case CalibState.Right:
+                                val_Right = medH;
+                                break;
+
+                            case CalibState.Left:
+                                val_Left = medH;
+                                break;
+                        }
+                    }
+                }
+
+                currentCalibState = CalibState.None;
+            };
+
+            calibForm.ShowDialog();
+        }
 
         private void BtnClose_Click(object sender, EventArgs e)
         {
@@ -253,9 +286,7 @@ namespace WindowsFormsApp1
             btnClose.Enabled = false;
         }
 
-        private void scope1_Click(object sender, EventArgs e) { }
-
-        private void SPort_DataReceived(object sender, System.IO.Ports.SerialDataReceivedEventArgs e)
+        private void SPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
         {
             while (sPort.BytesToRead > 0)
             {
@@ -279,6 +310,17 @@ namespace WindowsFormsApp1
 
                     if (data_count == 6)
                     {
+                        /*
+                        debug_hz_count++;
+                        TimeSpan span = DateTime.Now - last_debug_time;
+                        if (span.TotalSeconds >= 1.0)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"현재 샘플 레이트: {debug_hz_count} Hz");
+                            debug_hz_count = 0;
+                            last_debug_time = DateTime.Now;
+                        }
+                        */
+
                         Data_1 = ((data_buff[0] & 0x7F) << 7) + (data_buff[1] & 0x7F);
                         Data_2 = ((data_buff[2] & 0x7F) << 7) + (data_buff[3] & 0x7F);
                         Data_3 = 0;
@@ -286,16 +328,15 @@ namespace WindowsFormsApp1
                         double filteredData = eogFilter.ProcessSample(Data_1);
                         double filteredData2 = eogFilter2.ProcessSample(Data_2);
 
-                        // === [워밍업] 초반 데이터 200개 버리기 (그래프 튀는 현상 방지) ===
+                        // 워밍업: 초반 데이터 버림
                         if (stable_count < WARMUP_SAMPLES)
                         {
                             stable_count++;
                             start_flag = 0; data_count = 0;
-                            continue; // 여기서 함수 끝냄 (그래프 안 그림)
+                            continue;
                         }
 
-                        
-                        // ★★★ [수정] 그래프 그리기를 조건문 밖으로 뺐습니다! ★★★
+                        // 그래프 데이터 시프트
                         for (int i = 0; i < buffsize - 1; i++)
                         {
                             input_Data_1[i] = input_Data_1[i + 1];
@@ -306,59 +347,19 @@ namespace WindowsFormsApp1
 
                         input_Draw_1 = input_Data_1;
                         input_Draw_2 = input_Data_2;
-                        
 
-                        // --- [분기점] 캘리브레이션 중 vs 평상시 ---
+                        // 캘리브레이션 중 vs 평상시
                         if (currentCalibState != CalibState.None)
                         {
-                            // [캘리브레이션 모드]
-                            // ★ 어떤 상태이든 H, V 데이터 둘 다 모아야 나중에 계산 가능
-                            tempCalibBuffer_H.Add(filteredData);
-                            tempCalibBuffer_V.Add(filteredData2);
+                            lock (calibLock)
+                            {
+                                tempCalibBuffer_H.Add(filteredData);
+                                tempCalibBuffer_V.Add(filteredData2);
+                            }
                         }
                         else
                         {
-                            // [평상시 모드] TCP 전송 및 좌표 변환 로직
-                            if (isConnected && stream != null)
-                            {
-                                try
-                                {
-                                    // 1. 각도 계산 (기존 로직)
-                                    double angleX = (filteredData - val_Center_H) * K_Horz;
-                                    double angleY = (filteredData2 - val_Center_V) * K_Vert;
-
-                                    // 2. 드리프트 자동 보정 (중요!)
-                                    // 시선이 한쪽으로 쏠려 있으면, 중앙점(Center)을 아주 천천히 그쪽으로 이동시킵니다.
-                                    // EOG 신호가 시간이 지나면 흘러내리는 현상을 막아줍니다.
-                                    val_Center_H += (filteredData - val_Center_H) * 0.001;
-                                    val_Center_V += (filteredData2 - val_Center_V) * 0.001;
-
-                                    // 3. 각도 -> 픽셀 변환 (감도 조절)
-                                    // sensitivity 값을 키우면 눈을 조금만 움직여도 화면 끝까지 갑니다.
-                                    double sensitivity_H = 25.0;
-                                    double sensitivity_V = 100.0;// (기존보다 더 높임: 18.0 -> 25.0)
-
-                                    // 화면 중앙(320, 240)을 기준으로 더하고 뺍니다.
-                                    int pixelX = 320 + (int)(angleX * sensitivity_H);
-                                    int pixelY = 240 - (int)(angleY * sensitivity_V); // Y축은 위가 (-)라서 뺌
-
-                                    // 4. 화면 밖으로 나가지 않게 가두기 (Clamping)
-                                    pixelX = Math.Max(0, Math.Min(640, pixelX));
-                                    pixelY = Math.Max(0, Math.Min(480, pixelY));
-
-                                    // 5. 전송 (좌표값)
-                                    string msg = $"{pixelX},{pixelY}\n";
-                                    byte[] dataToSend = Encoding.UTF8.GetBytes(msg);
-                                    stream.Write(dataToSend, 0, dataToSend.Length);
-
-                                    // [디버깅] 값이 잘 나오는지 출력창에서 확인해보세요
-                                    System.Diagnostics.Debug.WriteLine($"Send: {pixelX}, {pixelY}");
-                                }
-                                catch
-                                {
-                                    isConnected = false;
-                                }
-                            }
+                            ProcessSmartGaze(filteredData, filteredData2);
                         }
 
                         start_flag = 0;
@@ -370,59 +371,84 @@ namespace WindowsFormsApp1
 
         private void On_timer1(object sender, EventArgs e)
         {
-            if (scope1.Channels.Count >0)
-            {
+            if (scope1.Channels.Count > 0)
                 scope1.Channels[0].Data.SetYData(input_Data_1);
-            }
-            
+
             if (scope2.Channels.Count > 0)
-            {
                 scope2.Channels[0].Data.SetYData(input_Data_2);
-            }
         }
 
         private void ConnectToPythonServer()
         {
             try
             {
-                client = new TcpClient("xx", 5000); // IP 확인 필요
+                client = new TcpClient("192.168.165.70", 5000); // IP 확인 필요
                 stream = client.GetStream();
                 isConnected = true;
                 MessageBox.Show("Python 서버와 연결 성공!");
             }
-            catch (Exception)
+            catch
             {
                 isConnected = false;
             }
         }
 
-        // === [6. 캘리브레이션 결과 계산 함수] ===
+        // === 캘리브레이션 결과 계산 ===
         private void CalculateConstants()
         {
-            // [1] 수평(H) 계산: 양 끝값(Right, Left)만 사용
-            double swingH = Math.Abs(val_Right - val_Left);
-            double estCenterH = (val_Right + val_Left) / 2.0; // 중앙값 추정
-            // 40도(우+20 ~ 좌-20) 움직였을 때 전압차(swingH)
-            // K값 계산: (전체 스윙 / 2)가 20도에 해당함
-            double halfSwingH = swingH / 2.0;
-            if (halfSwingH > 0.001) K_Horz = 20.0 / halfSwingH;
+            double targetAngleH = TARGET_ANGLE_H;
 
+            double deltaR_H = Math.Abs(val_Right - val_Center_H);
+            K_Horz_Right = (deltaR_H > 0.001) ? (targetAngleH / deltaR_H) : 1.0;
 
-            double deltaU = Math.Abs(val_Up - val_Center_V);
-            double deltaD = Math.Abs(val_Down - val_Center_V);
-            double halfSwingV = (deltaU + deltaD) / 2.0;
-            double targetAngleV = 10.0;
-            if (halfSwingV > 0.001) K_Vert = targetAngleV / halfSwingV;
+            double deltaL_H = Math.Abs(val_Left - val_Center_H);
+            K_Horz_Left = (deltaL_H > 0.001) ? (targetAngleH / deltaL_H) : 1.0;
 
-            // [4] Form1 변수 업데이트 (그래프 0점 보정용)
-            val_Center_H = estCenterH;
+            double targetAngleV = TARGET_ANGLE_V;
 
-            isCalibrated = true; // 이제부터 그래프 0점 보정 시작
+            double deltaU_V = Math.Abs(val_Up - val_Center_V);
+            K_Vert_Up = (deltaU_V > 0.001) ? (targetAngleV / deltaU_V) : 0.1;
 
-            MessageBox.Show("Peak-to-Peak 캘리브레이션 완료!\n\n" +
-                            $"[수평] 범위: {swingH:F0}, 중앙추정: {estCenterH:F0}\n" +
-                            $"[수직] 범위:{halfSwingV:F0}, 중앙추정: {val_Center_V:F0}\n\n" +
-                            $"K_H: {K_Horz:F3}, K_V: {K_Vert:F3}");
+            double deltaD_V = Math.Abs(val_Down - val_Center_V);
+            K_Vert_down = (deltaD_V > 0.001) ? (targetAngleV / deltaD_V) : 0.1;
+
+            // K 폭주 방지(임시 상한)
+            K_Horz_Right = Math.Min(K_Horz_Right, 5.0);
+            K_Horz_Left = Math.Min(K_Horz_Left, 5.0);
+            K_Vert_Up = Math.Min(K_Vert_Up, 5.0);
+            K_Vert_down = Math.Min(K_Vert_down, 5.0);
+
+            // 캘리브레이션 직후 화면 커서를 정중앙으로 리셋
+            screen_center_H = 320.0;
+            screen_center_V = 240.0;
+
+            holdPixel_H = 320.0;
+            holdPixel_V = 240.0;
+
+            ignoreTimer = 0;
+
+            smartBuff_H.Clear();
+            smartBuff_V.Clear();
+
+            isCalibrated = true;
+
+            MessageBox.Show(
+                "Peak-to-Peak 캘리브레이션 완료!\n\n" +
+                $"Center_H: {val_Center_H:F0}\n" +
+                $"Center_V: {val_Center_V:F0}\n\n" +
+                $"K_H_R: {K_Horz_Right:F3}, K_H_L: {K_Horz_Left:F3}\n" +
+                $"K_V_U: {K_Vert_Up:F3}, K_V_D: {K_Vert_down:F3}"
+            );
+        }
+
+        private double GetK_Horz(double diffH)
+        {
+            return (diffH > 0) ? K_Horz_Right : K_Horz_Left;
+        }
+
+        private double GetK_Vert(double diffV)
+        {
+            return (diffV > 0) ? K_Vert_Up : K_Vert_down;
         }
 
         // =========================================================
@@ -433,136 +459,164 @@ namespace WindowsFormsApp1
             // [1] 버퍼링
             smartBuff_H.Add(currH);
             smartBuff_V.Add(currV);
-
             if (smartBuff_H.Count < BUFF_SIZE) return;
 
             // [2] 데이터 준비
-            // delayed: 화면 출력용 (과거 - 상승 전 데이터)
             double delayedH = smartBuff_H[0];
             double delayedV = smartBuff_V[0];
-
-            // recent: 판단용 (최신 - 피크 데이터)
             double recentH = smartBuff_H[BUFF_SIZE - 1];
             double recentV = smartBuff_V[BUFF_SIZE - 1];
 
-            // 기울기 계산 (최근 5프레임 변화량)
-            double prevV = smartBuff_V[BUFF_SIZE - 6];
-            double slopeV = (recentV - prevV) / 5.0;
-
-            double prevH = smartBuff_H[BUFF_SIZE - 6];
-            double slopeH = (recentH - prevH) / 5.0;
-
-            // 현재 전압이 기준점(val_Center) 대비 얼마나 움직였는가?
-            double diffV = recentV - val_Center_V;
             double diffH = recentH - val_Center_H;
+            double diffV = recentV - val_Center_V;
 
-            // 감도 설정 (기존 코드 값 유지)
-            double sensitivity_H = 25.0; 
-            double sensitivity_V = 100.0; // 사용자가 설정한 값
+            // 각도 변환 gain
+            double K_Horz = GetK_Horz(diffH);
+            double K_Vert = GetK_Vert(diffV);
 
-            // ==========================================================
-            // [판단 로직]
-            // ==========================================================
+            // 기울기 보정 스케일
+            double scaleFactor = 50.0;
 
-            // [A] 블링크 무시 타이머 작동 중 (Case 1 처리 후)
+            // 1) 피크 찾기
+            double maxV = smartBuff_V.Max();
+            double minV = smartBuff_V.Min();
+            double peakV = (Math.Abs(maxV) > Math.Abs(minV)) ? maxV : minV;
+
+            int peakIdxV = smartBuff_V.LastIndexOf(peakV);
+            double stepsV = (BUFF_SIZE - 1) - peakIdxV;
+            if (stepsV < 1) stepsV = 1;
+
+            double maxH = smartBuff_H.Max();
+            double minH = smartBuff_H.Min();
+            double peakH = (Math.Abs(maxH) > Math.Abs(minH)) ? maxH : minH;
+
+            int peakIdxH = smartBuff_H.LastIndexOf(peakH);
+            double stepsH = (BUFF_SIZE - 1) - peakIdxH;
+            if (stepsH < 1) stepsH = 1;
+
+            // 2) 기울기
+            double slopeV_Raw = ((recentV - peakV) / stepsV) * scaleFactor;
+
+            double slopeV_Abs = ((Math.Abs(recentV) - Math.Abs(peakV)) / stepsV) * scaleFactor;
+            double slopeH_Abs = ((Math.Abs(recentH) - Math.Abs(peakH)) / stepsH) * scaleFactor;
+
+            // 3) 각도->픽셀 감도 (하드코딩 제거)
+            double sensitivity_H = 25; //(SCREEN_W / 2.0) / TARGET_ANGLE_H;  16
+            double sensitivity_V = 80;  //(SCREEN_H / 2.0) / TARGET_ANGLE_V; 24
+
+            // [A] 블링크 무시 타이머
             if (ignoreTimer > 0)
             {
                 ignoreTimer--;
-                
-                // 타이머가 끝나면, 현재 안정화된 전압을 새로운 0점으로 잡고
-                // 화면 기준점은 고정했던 그 자리로 설정 (Floating 완료)
+
                 if (ignoreTimer == 0)
                 {
-                    screen_center_H = holdPixel_H;
-                    screen_center_V = holdPixel_V;
-                    
-                    // 전압 기준점도 현재 값(안정화된 값)으로 갱신
-                    val_Center_H = smartBuff_H[BUFF_SIZE / 2];
-                    val_Center_V = smartBuff_V[BUFF_SIZE / 2];
-                    
-                    // 버퍼 비워서 새 출발
-                    smartBuff_H.Clear(); smartBuff_V.Clear();
+                    // 저장값을 center로 복귀 (클램프!)
+                    screen_center_H = Clamp(holdPixel_H, 0, SCREEN_W);
+                    screen_center_V = Clamp(holdPixel_V, 0, SCREEN_H);
+
+                    var tailH = smartBuff_H.Skip(Math.Max(0, BUFF_SIZE - 30)).ToList();
+                    var tailV = smartBuff_V.Skip(Math.Max(0, BUFF_SIZE - 30)).ToList();
+                    val_Center_H = GetMedian(tailH);
+                    val_Center_V = GetMedian(tailV);
+
+                    smartBuff_H.Clear();
+                    smartBuff_V.Clear();
                     return;
                 }
 
-                // 타이머 도중에는 고정된 좌표만 전송
                 SendViaTCP((int)holdPixel_H, (int)holdPixel_V);
-                
-                // 데이터 소비
-                smartBuff_H.RemoveAt(0); smartBuff_V.RemoveAt(0);
+
+                smartBuff_H.RemoveAt(0);
+                smartBuff_V.RemoveAt(0);
                 return;
             }
 
-            // [B] 이벤트 감지 (H 또는 V가 유의미하게 움직였을 때)
+            if (Math.Abs(diffV) > THRESH_BLINK_LEVEL)
+            {
+                // "지금 보고 있던 위치"를 고정하고 싶으면 outX/outY를 쓰는 게 제일 안정적
+                // (outInit이 아직 false면 화면 중앙 사용)
+                holdPixel_H = outInit ? outX : screen_center_H;
+                holdPixel_V = outInit ? outY : screen_center_V;
+
+                holdPixel_H = Clamp(holdPixel_H, 0, SCREEN_W);
+                holdPixel_V = Clamp(holdPixel_V, 0, SCREEN_H);
+
+                ignoreTimer = 250; // 기존 유지
+
+                SendViaTCP((int)holdPixel_H, (int)holdPixel_V);
+
+                // 아래 RemoveAt/return까지 해줘야 버퍼가 계속 굴러가면서 ignoreTimer 구간이 정상 동작함
+                smartBuff_H.RemoveAt(0);
+                smartBuff_V.RemoveAt(0);
+                return;
+            }
+
+            // [B] 이벤트 감지
             if (Math.Abs(diffV) > THRESH_LEVEL || Math.Abs(diffH) > THRESH_LEVEL)
             {
-                // ------------------------------------------------------
-                // Case 1: 블링크 (수직 급하강) -> 상승 전 좌표 고정
-                // ------------------------------------------------------
-                if (slopeV < THRESH_BLINK_SLOPE)
+                // Case 1: Blink
+                if (peakV > 0 && slopeV_Raw < THRESH_BLINK_SLOPE)
                 {
-                    // "상승 전 좌표" 계산 (delayed 데이터 + 현재 screen_center 사용)
-                    // 블링크 튀기 전의 평온했던 위치를 계산
-                    double preBlinkAngleX = (delayedH - val_Center_H) * K_Horz;
-                    double preBlinkAngleY = (delayedV - val_Center_V) * K_Vert;
+                    double preBlinkAngleX = (delayedH - val_Center_H) * GetK_Horz(delayedH - val_Center_H);
+                    double preBlinkAngleY = (delayedV - val_Center_V) * GetK_Vert(delayedV - val_Center_V);
 
                     holdPixel_H = screen_center_H + (preBlinkAngleX * sensitivity_H);
                     holdPixel_V = screen_center_V - (preBlinkAngleY * sensitivity_V);
 
-                    // 타이머 설정 (약 0.3~0.4초 무시)
-                    ignoreTimer = 25; 
-                    
+                    // ★ 저장값도 반드시 클램프
+                    holdPixel_H = Clamp(holdPixel_H, 0, SCREEN_W);
+                    holdPixel_V = Clamp(holdPixel_V, 0, SCREEN_H);
+
+                    // 500Hz 기준 0.5초 = 250샘플
+                    ignoreTimer = 250;
+
                     SendViaTCP((int)holdPixel_H, (int)holdPixel_V);
                 }
-                // ------------------------------------------------------
-                // Case 2: 응시/드리프트 (완만함) -> 피크 좌표 고정 & 0점 이동
-                // ------------------------------------------------------
-                else if (Math.Abs(slopeV) < THRESH_FIXATION_SLOPE &&
-                         Math.Abs(slopeH) < THRESH_FIXATION_SLOPE)
+                // Case 2: Fixation
+                else if (Math.Abs(slopeV_Abs) < THRESH_FIXATION_SLOPE &&
+                         Math.Abs(slopeH_Abs) < THRESH_FIXATION_SLOPE)
                 {
-                    // "피크 좌표" 계산 (recent 데이터 사용)
-                    // 지금 눈이 가 있는 그 위치
-                    double peakAngleX = (recentH - val_Center_H) * K_Horz;
-                    double peakAngleY = (recentV - val_Center_V) * K_Vert;
+                    double peakAngleX = (recentH - val_Center_H) * GetK_Horz(recentH - val_Center_H);
+                    double peakAngleY = (recentV - val_Center_V) * GetK_Vert(recentV - val_Center_V);
 
                     double currentPeakPixel_H = screen_center_H + (peakAngleX * sensitivity_H);
                     double currentPeakPixel_V = screen_center_V - (peakAngleY * sensitivity_V);
 
-                    // ★ 핵심: Floating Center 적용
-                    // 1. 화면의 기준점을 지금 보고 있는 '피크 위치'로 옮김
-                    screen_center_H = currentPeakPixel_H;
-                    screen_center_V = currentPeakPixel_V;
+                    // ★ center 갱신도 반드시 클램프
+                    screen_center_H = Clamp(currentPeakPixel_H, 0, SCREEN_W);
+                    screen_center_V = Clamp(currentPeakPixel_V, 0, SCREEN_H);
 
-                    // 2. 전압의 기준점을 지금 떠 있는 '높은 전압'으로 옮김
                     val_Center_H = recentH;
                     val_Center_V = recentV;
 
-                    // 3. 화면에는 옮겨진 기준점을 전송 (고정 효과)
                     SendViaTCP((int)screen_center_H, (int)screen_center_V);
 
-                    // 4. 버퍼 초기화 (과거 데이터 삭제로 즉시 반응)
-                    smartBuff_H.Clear(); smartBuff_V.Clear();
+                    smartBuff_H.Clear();
+                    smartBuff_V.Clear();
                     return;
                 }
-                // ------------------------------------------------------
-                // Case 3: 자유 이동 (Scan) -> 지연된 데이터 추적
-                // ------------------------------------------------------
+                // Case 3: Scan
                 else
                 {
-                    double moveAngleX = (delayedH - val_Center_H) * K_Horz;
-                    double moveAngleY = (delayedV - val_Center_V) * K_Vert;
+                    double moveAngleX = (delayedH - val_Center_H) * GetK_Horz(delayedH - val_Center_H);
+                    double moveAngleY = (delayedV - val_Center_V) * GetK_Vert(delayedV - val_Center_V);
 
                     double movePixelX = screen_center_H + (moveAngleX * sensitivity_H);
                     double movePixelY = screen_center_V - (moveAngleY * sensitivity_V);
 
                     SendViaTCP((int)movePixelX, (int)movePixelY);
+
+                    // center 드리프트 완만하게
+                    val_Center_H += (delayedH - val_Center_H) * 0.005;
+                    val_Center_V += (delayedV - val_Center_V) * 0.005;
                 }
             }
-            // [C] 평상시 (중앙 부근)
+            // [C] 평상시
             else
             {
-                double idleAngleX = (delayedH - val_Center_H) * K_Horz;
-                double idleAngleY = (delayedV - val_Center_V) * K_Vert;
+                double idleAngleX = (delayedH - val_Center_H) * GetK_Horz(delayedH - val_Center_H);
+                double idleAngleY = (delayedV - val_Center_V) * GetK_Vert(delayedV - val_Center_V);
 
                 double idlePixelX = screen_center_H + (idleAngleX * sensitivity_H);
                 double idlePixelY = screen_center_V - (idleAngleY * sensitivity_V);
@@ -570,23 +624,55 @@ namespace WindowsFormsApp1
                 SendViaTCP((int)idlePixelX, (int)idlePixelY);
             }
 
-            // 데이터 소비
             smartBuff_H.RemoveAt(0);
             smartBuff_V.RemoveAt(0);
         }
 
-        // [보조] TCP 전송 및 좌표 가두기(Clamping) 함수
+        // [보조] TCP 전송 및 좌표 가두기(Clamping)
         private void SendViaTCP(int x, int y)
         {
-            // 화면 밖으로 나가지 않게 가두기
-            x = Math.Max(0, Math.Min(640, x));
-            y = Math.Max(0, Math.Min(480, y));
+            // 1) 먼저 클램프
+            x = Math.Max(0, Math.Min(SCREEN_W, x));
+            y = Math.Max(0, Math.Min(SCREEN_H, y));
+
+            // 2) 블링크 고정 중에는 "즉시 고정" (원하는 느낌 유지)
+            //    - 너 코드에서 ignoreTimer 동안 holdPixel을 계속 보내는데,
+            //      여기서 EMA 걸면 고정이 살짝 미끄러질 수 있어서 바로 고정시킴
+            if (ignoreTimer > 0)
+            {
+                outX = x;
+                outY = y;
+                outInit = true;
+            }
+            else
+            {
+                // 3) 첫 프레임은 그대로
+                if (!outInit)
+                {
+                    outX = x;
+                    outY = y;
+                    outInit = true;
+                }
+                else
+                {
+                    // 4) EMA 스무딩: out = out + alpha*(target - out)
+                    outX = outX + OUT_ALPHA * (x - outX);
+                    outY = outY + OUT_ALPHA * (y - outY);
+                }
+            }
+
+            int sx = (int)Math.Round(outX);
+            int sy = (int)Math.Round(outY);
+
+            // 5) 마지막 클램프
+            sx = Math.Max(0, Math.Min(SCREEN_W, sx));
+            sy = Math.Max(0, Math.Min(SCREEN_H, sy));
 
             if (isConnected && stream != null)
             {
                 try
                 {
-                    string msg = $"{x},{y}\n";
+                    string msg = $"{sx},{sy}\n";
                     byte[] dataToSend = Encoding.UTF8.GetBytes(msg);
                     stream.Write(dataToSend, 0, dataToSend.Length);
                 }
@@ -594,7 +680,8 @@ namespace WindowsFormsApp1
                 {
                     isConnected = false;
                 }
-            }
+            }        
+    
         }
     }
 }
