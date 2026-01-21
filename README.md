@@ -16,11 +16,11 @@
 ### 🧠 Bio-Engineering & Embedded System
 | Project | Description & Tech |
 | :--- | :--- |
+| 2025 상하반기 <br> **Connectome-based AI for Drosophila** <br> _(Pytorch, DoOR, Connectome)_ | • **초파리 후각 시스템 커넥톰 모방, 냄새 분류 AI 모델** <br> • AI model tuning and testing, MLP to RNN to Reservoir, validate with random models <br> • How to use brain network as pretrained ANN model |
 | 2025 하반기 <br> **Smart Goggles** <br> _(MSP430, YOLO)_ | • **EOG based pointer + object detection AI** <br> • EOG AFE(Analog Front End) circuit PCB <br> • YOLOv8n and gTTS used, logic for EOG drift and Blink artifacts |
 | 2025 하반기 <br> **AI Home Training** <br> _(Jetson Orin, BlazePose)_ | • **실시간 관절점 인식 기반 자세 교정 디바이스** <br> • Jetson Orin Nano + TensorRT 가속 활용, 다인용 고성능 처리 <br> • 다인용 관절 각도 계산 알고리즘 및 시각/청각 피드백 시스템 |
 | 2025 상반기 <br> **Neural Stimulation** <br> _(Research)_ | • 정전류 자극기 및 DC-DC converter 아날로그 회로 설계 및 In-vivo 실험 <br> • 자극 안전성(Safety), Focality, Steerability 분석 및 시뮬레이션 |
 | 2025 상반기 <br> **Embedded & Analog Circuits** <br> _(ATmega128, LTspice, PCB)_ | • ATmega128 기반 미니카 제작 (거리 센서 연동 모터/LED 제어) <br> • PPG/스피커 아날로그 회로 설계 및 ECG 측정 PCB 납땜/검증 <br> • LTspice 시뮬레이션 및 오실로스코프 등 전자계측 장비 활용 |
-| 2025 상반기 <br> **Connectome-based AI for Drosophila** <br> _(Pytorch, DoOR, Connectome)_ | • **초파리 후각 시스템 커넥톰 모방, 냄새 분류 AI 모델** <br> • AI model tuning and testing, MLP to RNN to Reservoir, validate with random models <br> • How to use brain network as pretrained ANN model |
 ---
 
 ## 🔬 Research Interests
