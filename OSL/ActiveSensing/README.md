@@ -1,4 +1,3 @@
-```markdown
 # OSL (Odor Source Holding) — DQN 데모 (v0 / v1)
 
 중앙 `(0,0)`에 냄새 소스가 있고, 멀어질수록 농도가 감소하는 2D 환경에서  
