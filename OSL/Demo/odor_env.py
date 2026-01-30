@@ -24,6 +24,7 @@ class OdorHoldEnv(gym.Env):
         stack_n=4,
         seed=0,
         bg_c=0.0,   # 필요하면 0.005 같은 값으로 배경농도 추가
+        sensor_noise=0.01
     ):
         super().__init__()
         self.render_mode = render_mode
@@ -56,6 +57,7 @@ class OdorHoldEnv(gym.Env):
         self.x = 0.0
         self.y = 0.0
         self.th = 0.0
+        self.sensor_noise = float(sensor_noise)
 
         # render cache
         self._img_size = 360
@@ -78,6 +80,13 @@ class OdorHoldEnv(gym.Env):
 
         cL = self._conc(lx, ly)
         cR = self._conc(rx, ry)
+
+        if self.sensor_noise > 0:
+            cL += float(self.np_random.normal(0, self.sensor_noise))
+            cR += float(self.np_random.normal(0, self.sensor_noise))
+            cL = float(np.clip(cL, 0.0, 1.0))
+            cR = float(np.clip(cR, 0.0, 1.0))
+
         return np.array([cL, cR], dtype=np.float32)
 
     def _get_obs(self):

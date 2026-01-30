@@ -10,7 +10,7 @@ Gymnasium `CartPole-v1` 환경에서 **Actor-Critic**(공유 MLP trunk + actor/c
 
 ## 1) 요구사항
 
-- Python 3.8+
+- Python 3.12+
 - 주요 라이브러리
   - `gymnasium`
   - `numpy`
@@ -20,7 +20,7 @@ Gymnasium `CartPole-v1` 환경에서 **Actor-Critic**(공유 MLP trunk + actor/c
 
 설치 예시:
 ```bash
-pip install gymnasium numpy torch matplotlib imageio pillow
+pip install gymnasium numpy torch matplotlib imageio
 ````
 
 > `matplotlib.use("Agg")`를 사용하므로 GUI 없이(headless) 서버에서도 이미지 저장이 가능합니다.

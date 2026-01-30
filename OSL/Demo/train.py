@@ -9,6 +9,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import argparse
 
 # --- plotting / gif ---
 import matplotlib
@@ -80,20 +81,19 @@ def moving_avg(x, window=50):
     return np.convolve(x, kernel, mode="valid")
 
 
-def save_training_figure_dqn(run_dir, episodes, steps, returns, losses, eps_hist, window=50):
+def save_training_figure_dqn(run_dir, episodes, steps, returns, eps_hist, window=50):
     plots_dir = os.path.join(run_dir, "plots")
     os.makedirs(plots_dir, exist_ok=True)
 
     ep = np.asarray(episodes, dtype=np.int32)
     steps = np.asarray(steps, dtype=np.float32)
     returns = np.asarray(returns, dtype=np.float32)
-    losses = np.asarray(losses, dtype=np.float32)
     eps_hist = np.asarray(eps_hist, dtype=np.float32)
 
-    fig = plt.figure(figsize=(10, 8))
+    fig = plt.figure(figsize=(10, 5))
 
-    # (1) steps + return + epsilon
-    ax1 = fig.add_subplot(2, 1, 1)
+    # steps + return + epsilon
+    ax1 = fig.add_subplot(1, 1, 1)
     ax1.plot(ep, steps, alpha=0.35, label="steps/episode")
     ma_steps = moving_avg(steps, window)
     if len(ma_steps) > 0:
@@ -119,16 +119,6 @@ def save_training_figure_dqn(run_dir, episodes, steps, returns, losses, eps_hist
     ax1c.plot(ep, eps_hist, alpha=0.25, label="epsilon")
     ax1c.set_ylabel("epsilon")
 
-    # (2) td loss
-    ax2 = fig.add_subplot(2, 1, 2)
-    ax2.plot(ep, losses, alpha=0.35, label="td_loss")
-    ma_l = moving_avg(losses, window)
-    if len(ma_l) > 0:
-        ax2.plot(ep[len(ep) - len(ma_l):], ma_l, label=f"loss MA({window})")
-    ax2.set_xlabel("episode")
-    ax2.set_ylabel("loss")
-    ax2.grid(True, alpha=0.3)
-    ax2.legend(loc="upper right")
 
     out_path = os.path.join(plots_dir, "training_curves.png")
     fig.tight_layout()
@@ -200,7 +190,7 @@ def rollout_video_gif(env_id, model, device, seed, out_gif_path, fps=30, determi
 def train(
     env_id="OdorHold-v0",
     seed=0,
-    total_episodes=1200,
+    total_episodes=600,
 
     gamma=0.99,
     lr=3e-4,
@@ -229,15 +219,19 @@ def train(
     video_eval_seed=123,
 
     force_cpu=False,
+
+    env_kwargs = dict(
+    sensor_noise=0.01,  
+)
 ):
     # register env (gym.make 사용 유지)
     try:
-        gym.make(env_id)
+        gym.make(env_id, **(env_kwargs or {}))
     except Exception:
         register(
             id=env_id,
             entry_point="odor_env:OdorHoldEnv",
-            kwargs=dict(render_mode=None),
+            kwargs=dict(render_mode=None, **(env_kwargs or {})),
         )
 
     device = torch.device("cpu") if force_cpu else torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -263,7 +257,9 @@ def train(
         save_mid_episode=save_mid_episode,
         plot_ma_window=plot_ma_window,
         video_fps=video_fps, video_eval_seed=video_eval_seed,
+        env_kwargs=env_kwargs,
     )
+
     with open(os.path.join(run_dir, "config.json"), "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
 
@@ -302,7 +298,6 @@ def train(
     episodes = []
     ep_returns = []
     ep_steps_hist = []
-    loss_hist = []
     eps_hist = []
 
     global_step = 0
@@ -380,7 +375,6 @@ def train(
         episodes.append(ep)
         ep_returns.append(ep_ret)
         ep_steps_hist.append(endured_step)
-        loss_hist.append(mean_td_loss)
         eps_hist.append(float(eps))
 
         if ep == save_mid_episode:
@@ -391,12 +385,10 @@ def train(
         if ep % log_every == 0:
             mean_ret = np.mean(ep_returns[-log_every:])
             mean_steps = np.mean(ep_steps_hist[-log_every:])
-            mean_loss = np.mean(loss_hist[-log_every:])
-            mean_goal = np.mean([x for x in (np.array([0]*max(0, log_every-len(ep_returns))) + [0])])  # placeholder
             print(
                 f"Episode {ep:4d} | mean_steps({log_every})={mean_steps:6.1f} | "
                 f"mean_return({log_every})={mean_ret: .3f} | "
-                f"mean_loss({log_every})={mean_loss: .4f} | eps={eps:.2f}"
+                f"eps={eps:.2f}"
             )
 
     env.close()
@@ -406,7 +398,6 @@ def train(
         episodes=episodes,
         steps=ep_steps_hist,
         returns=ep_returns,
-        losses=loss_hist,
         eps_hist=eps_hist,
         window=plot_ma_window,
     )
@@ -442,4 +433,55 @@ def train(
 
 
 if __name__ == "__main__":
-    train()
+    p=argparse.ArgumentParser()
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--total-episodes", type=int, default=600)
+
+    p.add_argument("--gamma", type=float, default=0.99)
+    p.add_argument("--lr", type=float, default=3e-4)
+    p.add_argument("--max-grad-norm", type=float, default=10.0)
+
+    p.add_argument("--buffer-size", type=int, default=150000)
+    p.add_argument("--batch-size", type=int, default=256)
+    p.add_argument("--learning-starts", type=int, default=5000)
+    p.add_argument("--target-update-every", type=int, default=1000)
+
+    p.add_argument("--eps-start", type=float, default=1.0)
+    p.add_argument("--eps-end", type=float, default=0.05)
+    p.add_argument("--eps-decay-steps", type=int, default=80000)
+
+    p.add_argument("--out-dir", type=str, default=DEFAULT_OUT_DIR)
+    p.add_argument("--run-name", type=str, default=None)
+    p.add_argument("--save-mid-episode", type=int, default=None)
+    p.add_argument("--log-every", type=int, default=50)
+
+    p.add_argument("--plot-ma-window", type=int, default=50)
+    p.add_argument("--video-fps", type=int, default=30)
+    p.add_argument("--video-eval-seed", type=int, default=123)
+
+    p.add_argument("--force-cpu", action="store_true")
+    p.add_argument("--sensor-noise", type=float, default=0.01)
+
+    args = p.parse_args()
+    train(seed=args.seed,
+        total_episodes=args.total_episodes,
+        gamma=args.gamma,
+        lr=args.lr,
+        max_grad_norm=args.max_grad_norm,
+        buffer_size=args.buffer_size,
+        batch_size=args.batch_size,
+        learning_starts=args.learning_starts,
+        target_update_every=args.target_update_every,
+        eps_start=args.eps_start,
+        eps_end=args.eps_end,
+        eps_decay_steps=args.eps_decay_steps,
+        out_dir=args.out_dir,
+        run_name=args.run_name,
+        save_mid_episode=args.save_mid_episode,
+        log_every=args.log_every,
+        plot_ma_window=args.plot_ma_window,
+        video_fps=args.video_fps,
+        video_eval_seed=args.video_eval_seed,
+        force_cpu=args.force_cpu,
+        env_kwargs=dict(sensor_noise=args.sensor_noise),
+        )
