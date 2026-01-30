@@ -1,4 +1,3 @@
-```markdown
 # OSL (Odor Source Holding) — DQN 데모
 
 중앙 `(0,0)`에 냄새 소스가 있고, 멀어질수록 농도가 감소하는 2D 환경에서  
@@ -78,7 +77,3 @@ python eval.py --run_dir runs/odor_dqn_20260130_184544 --episodes 50 --save_json
 
 * 평가에서 greedy(ε=0)는 “랜덤 탐험 없이 항상 `argmax Q` 행동만 선택”을 뜻합니다.
 * `sensor_noise=0.01` 등 env 파라미터는 `config.json`의 `env_kwargs`로 저장되어 평가에도 동일 적용됩니다.
-
-```
-::contentReference[oaicite:0]{index=0}
-```
