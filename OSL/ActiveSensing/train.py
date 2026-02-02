@@ -81,44 +81,39 @@ def moving_avg(x, window=50):
     return np.convolve(x, kernel, mode="valid")
 
 
-def save_training_figure_dqn(run_dir, episodes, steps, returns, eps_hist, window=50):
+def save_training_figure_dqn(run_dir, episodes, success, goal_rate, avg_return, window=50):
     plots_dir = os.path.join(run_dir, "plots")
     os.makedirs(plots_dir, exist_ok=True)
 
     ep = np.asarray(episodes, dtype=np.int32)
-    steps = np.asarray(steps, dtype=np.float32)
-    returns = np.asarray(returns, dtype=np.float32)
-    eps_hist = np.asarray(eps_hist, dtype=np.float32)
+    success = np.asarray(success, dtype=np.float32)
+    goal_rate = np.asarray(goal_rate, dtype=np.float32)
+    avg_return = np.asarray(avg_return, dtype=np.float32)
 
-    fig = plt.figure(figsize=(10, 5))
+    s_ma = moving_avg(success, window)
+    g_ma = moving_avg(goal_rate, window)
+    ar_ma = moving_avg(avg_return, window)
+    fig = plt.figure(figsize=(9, 4))
+    ax = fig.add_subplot(1, 1, 1)
 
-    # steps + return + epsilon
-    ax1 = fig.add_subplot(1, 1, 1)
-    ax1.plot(ep, steps, alpha=0.35, label="steps/episode")
-    ma_steps = moving_avg(steps, window)
-    if len(ma_steps) > 0:
-        ax1.plot(ep[len(ep) - len(ma_steps):], ma_steps, label=f"steps MA({window})")
-    ax1.set_xlabel("episode")
-    ax1.set_ylabel("steps")
-    ax1.grid(True, alpha=0.3)
+    if len(s_ma) > 0:
+        ax.plot(ep[len(ep) - len(s_ma):], s_ma, label=f"success MovingAverage({window})")
+    if len(g_ma) > 0:
+        ax.plot(ep[len(ep) - len(g_ma):], g_ma, label=f"goal_rate MovingAverage({window})")
 
-    ax1b = ax1.twinx()
-    ax1b.plot(ep, returns, alpha=0.25, linestyle="--", label="episode_return")
-    ma_ret = moving_avg(returns, window)
-    if len(ma_ret) > 0:
-        ax1b.plot(ep[len(ep) - len(ma_ret):], ma_ret, linestyle="--", label=f"return MA({window})")
-    ax1b.set_ylabel("return")
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_xlabel("episode")
+    ax.set_ylabel("rate")
+    ax.grid(True, alpha=0.3)
 
-    h1, l1 = ax1.get_legend_handles_labels()
-    h2, l2 = ax1b.get_legend_handles_labels()
-    ax1.legend(h1 + h2, l1 + l2, loc="upper left")
+    axr = ax.twinx()
+    if len(ar_ma) > 0:
+        axr.plot(ep[len(ep) - len(ar_ma):], ar_ma, linestyle="--", label=f"avg_return MovingAverage({window})")
+    axr.set_ylabel("avg_return")
 
-    # epsilon (작게 표시)
-    ax1c = ax1.twinx()
-    ax1c.spines.right.set_position(("axes", 1.12))
-    ax1c.plot(ep, eps_hist, alpha=0.25, label="epsilon")
-    ax1c.set_ylabel("epsilon")
-
+    h1, l1 = ax.get_legend_handles_labels()
+    h2, l2 = axr.get_legend_handles_labels()
+    ax.legend(h1 + h2, l1 + l2, loc="lower right")
 
     out_path = os.path.join(plots_dir, "training_curves.png")
     fig.tight_layout()
@@ -153,7 +148,6 @@ def save_gif(frames, path, fps=30):
 def rollout_video_gif(env_id, model, device, seed, out_gif_path, fps=30, deterministic=True):
     env = gym.make(env_id, render_mode="rgb_array")
     obs, info = env.reset(seed=seed)
-
     frames = []
     frame = env.render()
     if frame is not None:
@@ -266,21 +260,13 @@ def train(
     metrics_path = os.path.join(run_dir, "metrics.csv")
     with open(metrics_path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow([
-            "episode",
-            "endured_step",
-            "episode_return",
-            "in_goal_steps",
-            "success",
-            "epsilon",
-            "td_loss",
-        ])
+        w.writerow(["episode", "endured_step", "in_goal_steps", "success", "goal_rate", "avg_return"])
 
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
 
-    env = gym.make(env_id)
+    env = gym.make(env_id, **(env_kwargs or {}))
     obs_dim = env.observation_space.shape[0]
     act_dim = env.action_space.n
 
@@ -296,9 +282,9 @@ def train(
     torch.save(q.state_dict(), os.path.join(ckpt_dir, "init.pt"))
 
     episodes = []
-    ep_returns = []
-    ep_steps_hist = []
-    eps_hist = []
+    ep_successes = []     # 0/1
+    ep_goal_rates = []    # in_goal_steps / steps
+    ep_avg_return = []         # episode_return / steps
 
     global_step = 0
 
@@ -308,8 +294,6 @@ def train(
         endured_step = 0
         ep_ret = 0.0
         in_goal_steps = 0
-
-        td_losses_this_ep = []
 
         while not done:
             endured_step += 1
@@ -359,23 +343,24 @@ def train(
                 nn.utils.clip_grad_norm_(q.parameters(), max_grad_norm)
                 optimizer.step()
 
-                td_losses_this_ep.append(float(loss.item()))
-
                 if global_step % target_update_every == 0:
                     tq.load_state_dict(q.state_dict())
 
         success = int(in_goal_steps > 0)
 
-        mean_td_loss = float(np.mean(td_losses_this_ep)) if len(td_losses_this_ep) > 0 else 0.0
+        episodes.append(ep)
+        # ep_returns.append(ep_ret)
+        # ep_steps_hist.append(endured_step)
+        ep_successes.append(success)
+        goal_rate = float(in_goal_steps) / float(endured_step) if endured_step > 0 else 0.0
+        avg_return = float(ep_ret) / float(endured_step) if endured_step > 0 else 0.0
+        ep_goal_rates.append(goal_rate)
+        ep_avg_return.append(avg_return)
 
         with open(metrics_path, "a", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
-            w.writerow([ep, endured_step, ep_ret, in_goal_steps, success, float(eps), mean_td_loss])
-
-        episodes.append(ep)
-        ep_returns.append(ep_ret)
-        ep_steps_hist.append(endured_step)
-        eps_hist.append(float(eps))
+            w.writerow([ep, endured_step, in_goal_steps, success, goal_rate, avg_return])
+        
 
         if ep == save_mid_episode:
             torch.save(q.state_dict(), os.path.join(ckpt_dir, "mid.pt"))
@@ -383,12 +368,15 @@ def train(
             torch.save(q.state_dict(), os.path.join(ckpt_dir, "final.pt"))
 
         if ep % log_every == 0:
-            mean_ret = np.mean(ep_returns[-log_every:])
-            mean_steps = np.mean(ep_steps_hist[-log_every:])
+            k = min(log_every, len(ep_successes))
+            mean_succ = float(np.mean(ep_successes[-k:]))
+            mean_goal = float(np.mean(ep_goal_rates[-k:]))
+            mean_avgr = float(np.mean(ep_avg_return[-k:]))
             print(
-                f"Episode {ep:4d} | mean_steps({log_every})={mean_steps:6.1f} | "
-                f"mean_return({log_every})={mean_ret: .3f} | "
-                f"eps={eps:.2f}"
+                f"Episode {ep:4d} | "
+                f"success({k})={mean_succ:.3f} | "
+                f"goal_rate({k})={mean_goal:.3f} | "
+                f"avg_return({k})={mean_avgr:.3f}"
             )
 
     env.close()
@@ -396,9 +384,9 @@ def train(
     save_training_figure_dqn(
         run_dir,
         episodes=episodes,
-        steps=ep_steps_hist,
-        returns=ep_returns,
-        eps_hist=eps_hist,
+        success=ep_successes,
+        goal_rate=ep_goal_rates,
+        avg_return=ep_avg_return,
         window=plot_ma_window,
     )
 
