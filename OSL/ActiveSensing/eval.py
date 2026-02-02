@@ -10,7 +10,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from gymnasium.envs.registration import register
+from gymnasium.envs.registration import register, registry
 
 
 # ---- Model (train과 동일) ----
@@ -29,25 +29,22 @@ class QNet(nn.Module):
         return self.net(x)
 
 
-def ensure_env_registered(env_id, env_kwargs):
-    try:
-        gym.make(env_id, **(env_kwargs or {}))
-        return
-    except Exception:
+def ensure_env_registered(env_id, entry_point, env_kwargs):
+    if env_id not in registry:
         register(
             id=env_id,
-            entry_point="odor_env_v1:OdorHoldEnv",
+            entry_point=entry_point,
             kwargs=dict(render_mode=None, **(env_kwargs or {})),
         )
-
 
 def load_run_config(run_dir):
     cfg_path = os.path.join(run_dir, "config.json")
     with open(cfg_path, "r", encoding="utf-8") as f:
         cfg = json.load(f)
-    env_id = cfg.get("env_id", "OdorHold-v0")
+    env_id = cfg.get("env_id", "OdorHold-v1")
+    entry_point = cfg.get("entry_point", "odor_env_v1:OdorHoldEnv")
     env_kwargs = cfg.get("env_kwargs", {})
-    return env_id, env_kwargs
+    return env_id, entry_point, env_kwargs
 
 
 def load_model(ckpt_path, obs_dim, act_dim, device):
@@ -89,8 +86,8 @@ def rollout_trajectories(env_id, env_kwargs, model, device, episodes=20, seed_ba
 
         trajs.append({
             "seed": seed_base + i,
-            "return": ep_ret,
-            "goal_rate": in_goal / max(1, steps),
+            "return": float(ep_ret),
+            "goal_rate": float(in_goal) / max(1, steps),
             "x": xs,
             "y": ys,
         })
@@ -143,8 +140,8 @@ def main():
     ap.add_argument("--save_json", action="store_true")  # trajectory raw 저장 옵션
     args = ap.parse_args()
 
-    env_id, env_kwargs = load_run_config(args.run_dir)
-    ensure_env_registered(env_id, env_kwargs)
+    env_id, entry_point, env_kwargs = load_run_config(args.run_dir)
+    ensure_env_registered(env_id, entry_point, env_kwargs)
 
     device = torch.device("cpu") if args.force_cpu else torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -160,7 +157,7 @@ def main():
 
     ckpts = [
         ("init",  os.path.join(ckpt_dir, "init.pt")),
-        ("mid",   os.path.join(ckpt_dir, "mid.pt")),
+        ("best",   os.path.join(ckpt_dir, "best.pt")),
         ("final", os.path.join(ckpt_dir, "final.pt")),
     ]
 
@@ -180,7 +177,7 @@ def main():
         if args.save_json:
             out_json = os.path.join(media_dir, f"traj_{tag}.json")
             with open(out_json, "w", encoding="utf-8") as f:
-                json.dump(trajs, f, ensure_ascii=False)
+                json.dump(trajs, f, ensure_ascii=False, indent=2)
 
         rets = [t["return"] for t in trajs]
         goals = [t["goal_rate"] for t in trajs]
