@@ -57,11 +57,15 @@ class OdorHoldEnv(gym.Env):
         self.action_space = spaces.Discrete(len(self.w_list))
 
         # per-step obs = [c, sin(phi), cos(phi)] => 3
-        obs_dim = 3 * self.stack_n
-        self.observation_space = spaces.Box(low=-1.0, high=1.0, shape=(obs_dim,), dtype=np.float32)
+        # obs_dim = 3 * self.stack_n
+        # self.observation_space = spaces.Box(low=-1.0, high=1.0, shape=(obs_dim,), dtype=np.float32)
+        # per-step obs = [c] => 1
+        obs_dim = 1 * self.stack_n
+        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(obs_dim,), dtype=np.float32)
 
+        self._obs_buf = np.zeros((self.stack_n,), dtype=np.float32)
         self.np_random = np.random.default_rng(seed)
-        self._obs_buf = np.zeros((self.stack_n, 3), dtype=np.float32)
+        # self._obs_buf = np.zeros((self.stack_n, 3), dtype=np.float32)
         self._step = 0
 
         self.x = 0.0
@@ -90,10 +94,12 @@ class OdorHoldEnv(gym.Env):
         self._sense_pt = (sx, sy)
         self.phi = float(phi)
         self.sense_ang = ang
-        return np.array([c, np.sin(phi), np.cos(phi)], dtype=np.float32)
+        # return np.array([c, np.sin(phi), np.cos(phi)], dtype=np.float32)
+        return np.float32(c) # return only concentration
 
     def _get_obs(self):
-        return self._obs_buf.reshape(-1).copy()
+        # return self._obs_buf.reshape(-1).copy()
+        return self._obs_buf.copy() # return only concentration stack
 
     def reset(self, seed=None, options=None):
         if seed is not None:
@@ -155,7 +161,8 @@ class OdorHoldEnv(gym.Env):
         info = {
             "d": d,
             "w": w,
-            "c": float(s[0]),
+            # "c": float(s[0]),
+            "c": float(s), # only concentration
             "scan_idx": int(self.scan_idx),
             "phi": float(self.phi),
             "sense_ang": float(self.sense_ang),
