@@ -3,29 +3,30 @@ import csv
 import time
 import json
 import random
+import argparse
 
 import gymnasium as gym
+from gymnasium.envs.registration import register, registry
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import argparse
 
 # --- plotting / gif ---
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from gymnasium.envs.registration import register
 
-# --- 상대경로를 통한 결과 저장 ---
+# --- paths ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_OUT_DIR = os.path.join(SCRIPT_DIR, "runs")
 
 
-# -----------------------
+# =======================
 # Model (DQN)
-# -----------------------
+# =======================
 class QNet(nn.Module):
     def __init__(self, obs_dim, act_dim, hidden=256):
         super().__init__()
@@ -41,9 +42,9 @@ class QNet(nn.Module):
         return self.net(x)
 
 
-# -----------------------
+# =======================
 # Replay Buffer
-# -----------------------
+# =======================
 class ReplayBuffer:
     def __init__(self, cap=150000):
         self.cap = int(cap)
@@ -58,8 +59,8 @@ class ReplayBuffer:
             self.buf[self.i] = item
         self.i = (self.i + 1) % self.cap
 
-    def sample(self, batch):
-        batch = random.sample(self.buf, batch)
+    def sample(self, batch_size):
+        batch = random.sample(self.buf, batch_size)
         s, a, r, ns, d = map(np.array, zip(*batch))
         return s, a, r, ns, d
 
@@ -67,9 +68,14 @@ class ReplayBuffer:
         return len(self.buf)
 
 
-# -----------------------
-# Utils: moving average / plots / gif
-# -----------------------
+# =======================
+# Utils
+# =======================
+def set_seed(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
 def moving_avg(x, window=50):
     if len(x) == 0:
         return np.array([])
@@ -79,7 +85,6 @@ def moving_avg(x, window=50):
         return x
     kernel = np.ones(w, dtype=np.float32) / w
     return np.convolve(x, kernel, mode="valid")
-
 
 def save_training_figure_dqn(run_dir, episodes, success, goal_rate, avg_return, window=50):
     plots_dir = os.path.join(run_dir, "plots")
@@ -93,13 +98,14 @@ def save_training_figure_dqn(run_dir, episodes, success, goal_rate, avg_return, 
     s_ma = moving_avg(success, window)
     g_ma = moving_avg(goal_rate, window)
     ar_ma = moving_avg(avg_return, window)
+
     fig = plt.figure(figsize=(9, 4))
     ax = fig.add_subplot(1, 1, 1)
 
     if len(s_ma) > 0:
-        ax.plot(ep[len(ep) - len(s_ma):], s_ma, label=f"success MovingAverage({window})")
+        ax.plot(ep[len(ep) - len(s_ma):], s_ma, label=f"success MA({window})")
     if len(g_ma) > 0:
-        ax.plot(ep[len(ep) - len(g_ma):], g_ma, label=f"goal_rate MovingAverage({window})")
+        ax.plot(ep[len(ep) - len(g_ma):], g_ma, label=f"goal_rate MA({window})")
 
     ax.set_ylim(-0.05, 1.05)
     ax.set_xlabel("episode")
@@ -108,7 +114,7 @@ def save_training_figure_dqn(run_dir, episodes, success, goal_rate, avg_return, 
 
     axr = ax.twinx()
     if len(ar_ma) > 0:
-        axr.plot(ep[len(ep) - len(ar_ma):], ar_ma, linestyle="--", label=f"avg_return MovingAverage({window})")
+        axr.plot(ep[len(ep) - len(ar_ma):], ar_ma, linestyle="--", label=f"avg_return MA({window})")
     axr.set_ylabel("avg_return")
 
     h1, l1 = ax.get_legend_handles_labels()
@@ -120,6 +126,7 @@ def save_training_figure_dqn(run_dir, episodes, success, goal_rate, avg_return, 
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
     return out_path
+
 def save_eval_figure_dqn(run_dir, eval_eps, eval_success, eval_goal_rate, eval_avg_return, best_ep=None):
     plots_dir = os.path.join(run_dir, "plots")
     os.makedirs(plots_dir, exist_ok=True)
@@ -159,7 +166,6 @@ def save_eval_figure_dqn(run_dir, eval_eps, eval_success, eval_goal_rate, eval_a
     plt.close(fig)
     return out_path
 
-
 def save_gif(frames, path, fps=30):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     duration = 1.0 / float(fps)
@@ -181,6 +187,26 @@ def save_gif(frames, path, fps=30):
         loop=0,
     )
 
+def ensure_env_registered(env_id, entry_point, env_kwargs):
+    if env_id in registry:
+        return
+    register(
+        id=env_id,
+        entry_point=entry_point,
+        kwargs=dict(render_mode=None, **(env_kwargs or {})),
+    )
+
+def load_ckpt(path, obs_dim, act_dim, device):
+    m = QNet(obs_dim, act_dim).to(device)
+    sd = torch.load(path, map_location=device)
+    m.load_state_dict(sd)
+    m.eval()
+    return m
+
+
+# =======================
+# Eval / Rollout
+# =======================
 @torch.no_grad()
 def eval_greedy(env_id, env_kwargs, model, device, episodes=30, seed_base=100000):
     env = gym.make(env_id, **(env_kwargs or {}))
@@ -199,7 +225,7 @@ def eval_greedy(env_id, env_kwargs, model, device, episodes=30, seed_base=100000
 
         while not done:
             obs_t = torch.as_tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
-            a = int(torch.argmax(model(obs_t), dim=1).item())  # greedy
+            a = int(torch.argmax(model(obs_t), dim=1).item())
 
             obs, r, term, trunc, info = env.step(a)
             done = bool(term or trunc)
@@ -208,26 +234,23 @@ def eval_greedy(env_id, env_kwargs, model, device, episodes=30, seed_base=100000
             in_goal += int(info.get("in_goal", 0))
             steps += 1
 
-        s = int(in_goal > 0)
-        gr = in_goal / max(1, steps)
-        ar = ep_ret / max(1, steps)
-
-        succ.append(s)
-        goal_rates.append(gr)
-        avg_returns.append(ar)
+        succ.append(int(in_goal > 0))
+        goal_rates.append(in_goal / max(1, steps))
+        avg_returns.append(ep_ret / max(1, steps))
 
     env.close()
 
-    # mean, std
     return (
         float(np.mean(succ)), float(np.std(succ)),
         float(np.mean(goal_rates)), float(np.std(goal_rates)),
         float(np.mean(avg_returns)), float(np.std(avg_returns)),
     )
+
 @torch.no_grad()
-def rollout_video_gif(env_id, model, device, seed, out_gif_path, fps=30, deterministic=True):
-    env = gym.make(env_id, render_mode="rgb_array")
-    obs, info = env.reset(seed=seed)
+def rollout_video_gif(env_id, env_kwargs, model, device, seed, out_gif_path, fps=30, deterministic=True):
+    env = gym.make(env_id, render_mode="rgb_array", **(env_kwargs or {}))
+    obs, _ = env.reset(seed=seed)
+
     frames = []
     frame = env.render()
     if frame is not None:
@@ -241,28 +264,28 @@ def rollout_video_gif(env_id, model, device, seed, out_gif_path, fps=30, determi
         if deterministic:
             action = int(torch.argmax(qvals).item())
         else:
-            # soft exploration for video (원하면)
             action = int(torch.randint(0, qvals.numel(), (1,)).item())
 
-        next_obs, reward, terminated, truncated, info = env.step(action)
-        done = bool(terminated or truncated)
+        obs, _, term, trunc, _ = env.step(action)
+        done = bool(term or trunc)
 
         frame = env.render()
         if frame is not None:
             frames.append(frame)
-
-        obs = next_obs
 
     env.close()
     save_gif(frames, out_gif_path, fps=fps)
     return frames
 
 
-# -----------------------
-# Train (DQN)
-# -----------------------
+# =======================
+# Train
+# =======================
 def train(
     env_id="OdorHold-v1",
+    entry_point="odor_env_v1:OdorHoldEnv",
+    env_kwargs=None,
+
     seed=0,
     total_episodes=600,
 
@@ -270,47 +293,32 @@ def train(
     lr=3e-4,
     max_grad_norm=10.0,
 
-    # DQN core
     buffer_size=150000,
     batch_size=256,
     learning_starts=5000,      # steps
     target_update_every=1000,  # steps
 
-    # epsilon schedule (step-based)
     eps_start=1.0,
     eps_end=0.05,
     eps_decay_steps=80000,
 
-    # 저장 관련
     out_dir=DEFAULT_OUT_DIR,
     run_name=None,
     log_every=50,
-    
-    # 평가 관련
+
     eval_every=50,
     eval_episodes=30,
     eval_seed_base=100000,
 
-    # 시각화 관련
     plot_ma_window=50,
     video_fps=30,
     video_eval_seed=123,
 
     force_cpu=False,
-
-    env_kwargs = dict(
-    sensor_noise=0.01,  
-)
 ):
-    # register env (gym.make 사용 유지)
-    try:
-        gym.make(env_id, **(env_kwargs or {}))
-    except Exception:
-        register(
-            id=env_id,
-            entry_point="odor_env_v1:OdorHoldEnv",
-            kwargs=dict(render_mode=None, **(env_kwargs or {})),
-        )
+    env_kwargs = env_kwargs or {}
+
+    ensure_env_registered(env_id, entry_point, env_kwargs)
 
     device = torch.device("cpu") if force_cpu else torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -323,23 +331,31 @@ def train(
     os.makedirs(media_dir, exist_ok=True)
 
     config = dict(
-        env_id=env_id, seed=seed, total_episodes=total_episodes,
-        gamma=gamma, lr=lr,
-        buffer_size=buffer_size, batch_size=batch_size,
-        learning_starts=learning_starts, target_update_every=target_update_every,
-        eps_start=eps_start, eps_end=eps_end, eps_decay_steps=eps_decay_steps,
-        max_grad_norm=max_grad_norm, force_cpu=force_cpu,
-
+        env_id=env_id,
+        entry_point=entry_point,
+        env_kwargs=env_kwargs,
+        seed=seed,
+        total_episodes=total_episodes,
+        gamma=gamma,
+        lr=lr,
+        max_grad_norm=max_grad_norm,
+        buffer_size=buffer_size,
+        batch_size=batch_size,
+        learning_starts=learning_starts,
+        target_update_every=target_update_every,
+        eps_start=eps_start,
+        eps_end=eps_end,
+        eps_decay_steps=eps_decay_steps,
         log_every=log_every,
         eval_every=eval_every,
         eval_episodes=eval_episodes,
         eval_seed_base=eval_seed_base,
-
         plot_ma_window=plot_ma_window,
-        video_fps=video_fps, video_eval_seed=video_eval_seed,
-        env_kwargs=env_kwargs,
+        video_fps=video_fps,
+        video_eval_seed=video_eval_seed,
+        force_cpu=force_cpu,
+        device=str(device),
     )
-
     with open(os.path.join(run_dir, "config.json"), "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
 
@@ -348,30 +364,33 @@ def train(
         w = csv.writer(f)
         w.writerow(["episode", "endured_step", "in_goal_steps", "success", "goal_rate", "avg_return"])
 
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
+    eval_metrics_path = os.path.join(run_dir, "metrics_eval.csv")
+    with open(eval_metrics_path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["episode", "success_mean", "goal_rate_mean", "avg_return_mean"])
 
-    env = gym.make(env_id, **(env_kwargs or {}))
+    set_seed(seed)
+
+    env = gym.make(env_id, **env_kwargs)
     obs_dim = env.observation_space.shape[0]
     act_dim = env.action_space.n
 
     q = QNet(obs_dim, act_dim).to(device)
     tq = QNet(obs_dim, act_dim).to(device)
     tq.load_state_dict(q.state_dict())
+
     optimizer = optim.Adam(q.parameters(), lr=lr)
     huber = nn.SmoothL1Loss()
 
     rb = ReplayBuffer(buffer_size)
 
-    # init ckpt
     torch.save(q.state_dict(), os.path.join(ckpt_dir, "init.pt"))
 
     episodes = []
-    ep_successes = []     # 0/1
-    ep_goal_rates = []    # in_goal_steps / steps
-    ep_avg_return = []         # episode_return / steps
-    
+    ep_successes = []
+    ep_goal_rates = []
+    ep_avg_returns = []
+
     best_score = -1e9
     best_ep = None
     best_path = os.path.join(ckpt_dir, "best.pt")
@@ -381,15 +400,10 @@ def train(
     eval_goal_m = []
     eval_avgr_m = []
 
-    eval_metrics_path = os.path.join(run_dir, "metrics_eval.csv")
-    with open(eval_metrics_path, "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(["episode", "success_mean", "goal_rate_mean", "avg_return_mean"])
-
     global_step = 0
 
     for ep in range(1, total_episodes + 1):
-        obs, info = env.reset(seed=seed + ep)
+        obs, _ = env.reset(seed=seed + ep)
         done = False
         endured_step = 0
         ep_ret = 0.0
@@ -407,11 +421,10 @@ def train(
             else:
                 with torch.no_grad():
                     obs_t = torch.as_tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
-                    qvals = q(obs_t).squeeze(0)
-                    action = int(torch.argmax(qvals).item())
+                    action = int(torch.argmax(q(obs_t), dim=1).item())
 
-            next_obs, reward, terminated, truncated, info = env.step(action)
-            done = bool(terminated or truncated)
+            next_obs, reward, term, trunc, info = env.step(action)
+            done = bool(term or trunc)
 
             rb.push(obs, action, float(reward), next_obs, float(done))
 
@@ -420,25 +433,25 @@ def train(
             in_goal_steps += int(info.get("in_goal", 0))
 
             # learn
-            if len(rb) >= learning_starts:
+            if global_step >= learning_starts and len(rb) >= batch_size:
                 bs, ba, br, bns, bd = rb.sample(batch_size)
 
-                bs = torch.tensor(bs, dtype=torch.float32, device=device)
-                ba = torch.tensor(ba, dtype=torch.int64, device=device).unsqueeze(1)
-                br = torch.tensor(br, dtype=torch.float32, device=device).unsqueeze(1)
-                bns = torch.tensor(bns, dtype=torch.float32, device=device)
-                bd = torch.tensor(bd, dtype=torch.float32, device=device).unsqueeze(1)
+                bs = torch.as_tensor(bs, dtype=torch.float32, device=device)
+                ba = torch.as_tensor(ba, dtype=torch.int64, device=device).unsqueeze(1)
+                br = torch.as_tensor(br, dtype=torch.float32, device=device).unsqueeze(1)
+                bns = torch.as_tensor(bns, dtype=torch.float32, device=device)
+                bd = torch.as_tensor(bd, dtype=torch.float32, device=device).unsqueeze(1)
 
                 qsa = q(bs).gather(1, ba)
 
                 with torch.no_grad():
-                    # Double DQN
+                    # Double DQN target
                     next_a = torch.argmax(q(bns), dim=1, keepdim=True)
                     next_q = tq(bns).gather(1, next_a)
                     y = br + gamma * (1.0 - bd) * next_q
 
                 loss = huber(qsa, y)
-                optimizer.zero_grad()
+                optimizer.zero_grad(set_to_none=True)
                 loss.backward()
                 nn.utils.clip_grad_norm_(q.parameters(), max_grad_norm)
                 optimizer.step()
@@ -447,15 +460,13 @@ def train(
                     tq.load_state_dict(q.state_dict())
 
         success = int(in_goal_steps > 0)
-
-        episodes.append(ep)
-        # ep_returns.append(ep_ret)
-        # ep_steps_hist.append(endured_step)
-        ep_successes.append(success)
         goal_rate = float(in_goal_steps) / float(endured_step) if endured_step > 0 else 0.0
         avg_return = float(ep_ret) / float(endured_step) if endured_step > 0 else 0.0
+
+        episodes.append(ep)
+        ep_successes.append(success)
         ep_goal_rates.append(goal_rate)
-        ep_avg_return.append(avg_return)
+        ep_avg_returns.append(avg_return)
 
         with open(metrics_path, "a", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
@@ -463,13 +474,12 @@ def train(
 
         # ---- periodic eval (greedy) + best checkpoint ----
         if (ep % eval_every == 0) or (ep == 1) or (ep == total_episodes):
-            sm, ss, gm, gs, am, astd = eval_greedy(
+            sm, _, gm, _, am, _ = eval_greedy(
                 env_id, env_kwargs, q, device,
                 episodes=eval_episodes,
                 seed_base=eval_seed_base
             )
 
-            # eval curve 저장용 (mean만)
             eval_eps.append(ep)
             eval_succ_m.append(sm)
             eval_goal_m.append(gm)
@@ -479,7 +489,6 @@ def train(
                 w = csv.writer(f)
                 w.writerow([ep, sm, gm, am])
 
-            # best 기준: goal_rate 우선, 동률이면 avg_return
             score = gm * 1000.0 + am
             if score > best_score:
                 best_score = score
@@ -491,38 +500,27 @@ def train(
                         f, ensure_ascii=False, indent=2
                     )
 
-            print(
-                f"[EVAL] ep={ep} | success={sm:.3f} | "
-                f"goal_rate={gm:.3f} | avg_return={am:.3f} | best_ep={best_ep}"
-            )
-        
-
-        if ep == total_episodes:
-            torch.save(q.state_dict(), os.path.join(ckpt_dir, "final.pt"))
+            print(f"[EVAL] ep={ep} | success={sm:.3f} | goal_rate={gm:.3f} | avg_return={am:.3f} | best_ep={best_ep}")
 
         if ep % log_every == 0:
             k = min(log_every, len(ep_successes))
             mean_succ = float(np.mean(ep_successes[-k:]))
             mean_goal = float(np.mean(ep_goal_rates[-k:]))
-            mean_avgr = float(np.mean(ep_avg_return[-k:]))
-            print(
-                f"[TRAIN] ep={ep:4d} | "
-                f"success({k})={mean_succ:.3f} | "
-                f"goal_rate({k})={mean_goal:.3f} | "
-                f"avg_return({k})={mean_avgr:.3f}"
-            )
+            mean_avgr = float(np.mean(ep_avg_returns[-k:]))
+            print(f"[TRAIN] ep={ep:4d} | success({k})={mean_succ:.3f} | goal_rate({k})={mean_goal:.3f} | avg_return({k})={mean_avgr:.3f}")
 
     env.close()
+
+    torch.save(q.state_dict(), os.path.join(ckpt_dir, "final.pt"))
 
     save_training_figure_dqn(
         run_dir,
         episodes=episodes,
         success=ep_successes,
         goal_rate=ep_goal_rates,
-        avg_return=ep_avg_return,
+        avg_return=ep_avg_returns,
         window=plot_ma_window,
     )
-    
     save_eval_figure_dqn(
         run_dir,
         eval_eps=eval_eps,
@@ -531,33 +529,27 @@ def train(
         eval_avg_return=eval_avgr_m,
         best_ep=best_ep,
     )
-    def load_ckpt(path):
-        m = QNet(obs_dim, act_dim).to(device)
-        sd = torch.load(path, map_location=device)
-        m.load_state_dict(sd)
-        m.eval()
-        return m
 
-    init_model = load_ckpt(os.path.join(ckpt_dir, "init.pt"))
-    final_model = load_ckpt(os.path.join(ckpt_dir, "final.pt"))
+    init_model = load_ckpt(os.path.join(ckpt_dir, "init.pt"), obs_dim, act_dim, device)
+    final_model = load_ckpt(os.path.join(ckpt_dir, "final.pt"), obs_dim, act_dim, device)
 
     best_ckpt = os.path.join(ckpt_dir, "best.pt")
     if not os.path.exists(best_ckpt):
         best_ckpt = os.path.join(ckpt_dir, "final.pt")
-    best_model = load_ckpt(best_ckpt)
+    best_model = load_ckpt(best_ckpt, obs_dim, act_dim, device)
 
     rollout_video_gif(
-        env_id, init_model, device, seed=video_eval_seed,
+        env_id, env_kwargs, init_model, device, seed=video_eval_seed,
         out_gif_path=os.path.join(media_dir, "init.gif"),
         fps=video_fps, deterministic=True
     )
     rollout_video_gif(
-        env_id, best_model, device, seed=video_eval_seed,
+        env_id, env_kwargs, best_model, device, seed=video_eval_seed,
         out_gif_path=os.path.join(media_dir, "best.gif"),
         fps=video_fps, deterministic=True
     )
     rollout_video_gif(
-        env_id, final_model, device, seed=video_eval_seed,
+        env_id, env_kwargs, final_model, device, seed=video_eval_seed,
         out_gif_path=os.path.join(media_dir, "final.gif"),
         fps=video_fps, deterministic=True
     )
@@ -565,8 +557,16 @@ def train(
     return q, run_dir
 
 
+# =======================
+# CLI
+# =======================
 if __name__ == "__main__":
-    p=argparse.ArgumentParser()
+    p = argparse.ArgumentParser()
+
+    p.add_argument("--env-id", type=str, default="OdorHold-v1")
+    p.add_argument("--entry-point", type=str, default="odor_env_v1:OdorHoldEnv")
+    p.add_argument("--sensor-noise", type=float, default=0.01)
+
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--total-episodes", type=int, default=600)
 
@@ -596,30 +596,41 @@ if __name__ == "__main__":
     p.add_argument("--video-eval-seed", type=int, default=123)
 
     p.add_argument("--force-cpu", action="store_true")
-    p.add_argument("--sensor-noise", type=float, default=0.01)
 
     args = p.parse_args()
-    train(seed=args.seed,
+
+    train(
+        env_id=args.env_id,
+        entry_point=args.entry_point,
+        env_kwargs=dict(sensor_noise=args.sensor_noise),
+
+        seed=args.seed,
         total_episodes=args.total_episodes,
+
         gamma=args.gamma,
         lr=args.lr,
         max_grad_norm=args.max_grad_norm,
+
         buffer_size=args.buffer_size,
         batch_size=args.batch_size,
         learning_starts=args.learning_starts,
         target_update_every=args.target_update_every,
+
         eps_start=args.eps_start,
         eps_end=args.eps_end,
         eps_decay_steps=args.eps_decay_steps,
+
         out_dir=args.out_dir,
         run_name=args.run_name,
         log_every=args.log_every,
+
         eval_every=args.eval_every,
         eval_episodes=args.eval_episodes,
         eval_seed_base=args.eval_seed_base,
+
         plot_ma_window=args.plot_ma_window,
         video_fps=args.video_fps,
         video_eval_seed=args.video_eval_seed,
+
         force_cpu=args.force_cpu,
-        env_kwargs=dict(sensor_noise=args.sensor_noise),
-        )
+    )
