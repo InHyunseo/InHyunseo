@@ -266,8 +266,8 @@ def find_success_seed(env_id, env_kwargs, model, device, seed_start=123, max_tri
 # Train
 # =======================
 def train(
-    env_id="OdorHold-v2",
-    entry_point="odor_env_v2:OdorHoldEnv",
+    env_id="OdorHold-v3",
+    entry_point="odor_env_v3:OdorHoldEnv",
     env_kwargs=None,
 
     seed=0,
@@ -578,8 +578,8 @@ def train(
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
 
-    p.add_argument("--env-id", type=str, default="OdorHold-v2")
-    p.add_argument("--entry-point", type=str, default="odor_env_v2:OdorHoldEnv")
+    p.add_argument("--env-id", type=str, default="OdorHold-v3")
+    p.add_argument("--entry-point", type=str, default="odor_env_v3:OdorHoldEnv")
     p.add_argument("--sensor-noise", type=float, default=0.01)
         # --- CLI args 추가 ---
     p.add_argument("--scan-penalty", type=float, default=0.01)

@@ -41,8 +41,8 @@ def load_run_config(run_dir):
     cfg_path = os.path.join(run_dir, "config.json")
     with open(cfg_path, "r", encoding="utf-8") as f:
         cfg = json.load(f)
-    env_id = cfg.get("env_id", "OdorHold-v2")
-    entry_point = cfg.get("entry_point", "odor_env_v2:OdorHoldEnv")
+    env_id = cfg.get("env_id", "OdorHold-v3")
+    entry_point = cfg.get("entry_point", "odor_env_v3:OdorHoldEnv")
     env_kwargs = cfg.get("env_kwargs", {})
     return env_id, entry_point, env_kwargs
 
