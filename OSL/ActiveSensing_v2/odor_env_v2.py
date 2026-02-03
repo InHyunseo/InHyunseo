@@ -92,6 +92,8 @@ class OdorHoldEnv(gym.Env):
         self._sense_pt = None
         self._render_scan_idx = 0  # 0=F, 1=L, 2=R
         self._render_mode = 0
+        self._heatmap_img = None
+        self._cbar_img = None
 
     def _conc(self, x, y):
         r2 = x * x + y * y
@@ -262,7 +264,35 @@ class OdorHoldEnv(gym.Env):
             return None
 
         W = H = self._img_size
-        img = Image.new("RGB", (W, H), (255, 255, 255))
+        if self._heatmap_img is None or self._heatmap_img.size != (W, H):
+            xs = np.linspace(-self.L, self.L, W, dtype=np.float32)
+            ys = np.linspace(self.L, -self.L, H, dtype=np.float32)
+            X, Y = np.meshgrid(xs, ys)
+            r2 = X * X + Y * Y
+            c = np.exp(-r2 / (2.0 * self.sigma_c * self.sigma_c))
+            c = self.bg_c + (1.0 - self.bg_c) * c
+            c = np.clip(c, 0.0, 1.0)
+            try:
+                from matplotlib import cm
+                rgb = (cm.inferno(c)[..., :3] * 255.0).astype(np.uint8)
+            except Exception:
+                v = (c * 255.0).astype(np.uint8)
+                rgb = np.stack([v, v, v], axis=-1)
+            self._heatmap_img = Image.fromarray(rgb, mode="RGB")
+            # colorbar image (vertical)
+            bar_w = max(10, int(W * 0.04))
+            bar_h = max(80, int(H * 0.5))
+            grad = np.linspace(1.0, 0.0, bar_h, dtype=np.float32)[:, None]
+            try:
+                from matplotlib import cm
+                bar_rgb = (cm.inferno(grad)[..., :3] * 255.0).astype(np.uint8)
+            except Exception:
+                v = (grad * 255.0).astype(np.uint8)
+                bar_rgb = np.repeat(v, 3, axis=1)[:, None, :]
+            bar_rgb = np.repeat(bar_rgb, bar_w, axis=1)
+            self._cbar_img = Image.fromarray(bar_rgb, mode="RGB")
+
+        img = self._heatmap_img.copy()
         draw = ImageDraw.Draw(img)
 
         def to_px(x, y):
@@ -297,6 +327,18 @@ class OdorHoldEnv(gym.Env):
             labels = ["F", "L", "R"]
             try:
                 draw.text((ax + 8, ay + 8), labels[int(self._render_scan_idx)], fill=(0, 0, 0))
+            except Exception:
+                pass
+
+        # colorbar overlay
+        if self._cbar_img is not None:
+            pad = 6
+            bx = W - self._cbar_img.size[0] - pad
+            by = pad
+            img.paste(self._cbar_img, (bx, by))
+            try:
+                draw.text((bx - 2, by - 2), "1.0", fill=(0, 0, 0))
+                draw.text((bx - 2, by + self._cbar_img.size[1] - 10), "0.0", fill=(0, 0, 0))
             except Exception:
                 pass
 

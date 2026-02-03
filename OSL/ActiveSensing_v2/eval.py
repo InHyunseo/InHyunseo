@@ -60,6 +60,8 @@ def rollout_trajectories(env_id, env_kwargs, model, device, episodes=20, seed_ba
     env = gym.make(env_id, **(env_kwargs or {}))
     L = float(env.unwrapped.L)
     r_goal = float(env.unwrapped.r_goal)
+    sigma_c = float(env.unwrapped.sigma_c)
+    bg_c = float(env.unwrapped.bg_c)
 
     trajs = []
     for i in range(episodes):
@@ -93,10 +95,10 @@ def rollout_trajectories(env_id, env_kwargs, model, device, episodes=20, seed_ba
         })
 
     env.close()
-    return trajs, L, r_goal
+    return trajs, L, r_goal, sigma_c, bg_c
 
 
-def save_traj_plot(out_path, trajs, L, r_goal, title):
+def save_traj_plot(out_path, trajs, L, r_goal, sigma_c, bg_c, title):
     fig = plt.figure(figsize=(7, 7))
     ax = fig.add_subplot(1, 1, 1)
 
@@ -105,6 +107,19 @@ def save_traj_plot(out_path, trajs, L, r_goal, title):
     ax.set_ylim(-L, L)
     ax.set_aspect("equal", adjustable="box")
     ax.grid(True, alpha=0.3)
+
+    # odor concentration heatmap
+    res = 220
+    xs = np.linspace(-L, L, res, dtype=np.float32)
+    ys = np.linspace(-L, L, res, dtype=np.float32)
+    X, Y = np.meshgrid(xs, ys)
+    r2 = X * X + Y * Y
+    c = np.exp(-r2 / (2.0 * sigma_c * sigma_c))
+    c = bg_c + (1.0 - bg_c) * c
+    c = np.clip(c, 0.0, 1.0)
+    im = ax.imshow(c, extent=[-L, L, -L, L], origin="lower", cmap="inferno", alpha=0.5)
+    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cbar.set_label("odor concentration")
 
     # source at (0,0)
     ax.plot([0], [0], marker="o")
@@ -167,12 +182,12 @@ def main():
             continue
 
         model = load_model(ckpt_path, obs_dim, act_dim, device)
-        trajs, L, r_goal = rollout_trajectories(
+        trajs, L, r_goal, sigma_c, bg_c = rollout_trajectories(
             env_id, env_kwargs,model, device, episodes=args.episodes, seed_base=args.seed_base
         )
 
         out_png = os.path.join(media_dir, f"traj_{tag}.png")
-        save_traj_plot(out_png, trajs, L, r_goal, title=f"{tag}.pt")
+        save_traj_plot(out_png, trajs, L, r_goal, sigma_c, bg_c, title=f"{tag}.pt")
 
         if args.save_json:
             out_json = os.path.join(media_dir, f"traj_{tag}.json")
