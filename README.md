@@ -5,7 +5,7 @@
 | Project | Description & Tech |
 | :--- | :--- |
 | **CAV Cooperation** <br> _(C++, Python, ROS2)_ | • 협력 자율주행(CAV) 교차로/합류 시나리오 알고리즘 설계 <br> • 충돌 위험 Zone 예측 및 ETA, 도로법 등 현실 기반 리더 차량 선정 로직 구현 |
-| **Odor Source Localization Robot** <br> _(Python, ROS2)_ | • 난류 환경에서의 냄새 추적 강화학습 알고리즘 <br> • 센서 퓨전 |
+| **Odor Source Localization Robot** <br> _(Python, ROS2)_ | • 난류 환경에서의 냄새 추적 강화학습 알고리즘 <br> • 센서 퓨전 <br> • Bio-inspired|
 
 ## Previous Projects
 ### 🚗 Autonomous Systems & Robotics
