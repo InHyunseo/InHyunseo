@@ -1,7 +1,7 @@
-# odor_env_v3.py (OdorHold-v3) - Wind-shaped plume, wind sensor in obs
+# odor_env_v3.py (OdorHold-v3) - Wind-shaped plume, no wind sensor in obs
 # - action: 0=RUN, 1=CAST(start)
 # - CAST auto-completes L/R/L/R (4 steps) while agent sees no phi-label
-# - obs per step: [c, mode], stacked + wind sensor [wind_x, wind_y]
+# - obs per step: [c, mode], stacked
 
 import numpy as np
 import gymnasium as gym
@@ -54,7 +54,6 @@ class OdorHoldEnv(gym.Env):
             self._wind_dir = (self.wind_x / self._wind_mag, self.wind_y / self._wind_mag)
         else:
             self._wind_dir = (1.0, 0.0)
-        self._wind_obs = np.array([self.wind_x, self.wind_y], dtype=np.float32)
 
         self.sigma_c = float(sigma_c)
         self.sigma_r = float(sigma_r)
@@ -75,15 +74,11 @@ class OdorHoldEnv(gym.Env):
         # action: 0 RUN, 1 CAST
         self.action_space = spaces.Discrete(2)
 
-        # obs per step: [c, mode] (NO phi label), plus wind sensor [wind_x, wind_y]
+        # obs per step: [c, mode] (NO phi label)
         self.obs_step_dim = 2
-        self.wind_obs_dim = 2
-        obs_dim = self.obs_step_dim * self.stack_n + self.wind_obs_dim
-        low = np.full((obs_dim,), -1.0, dtype=np.float32)
-        high = np.full((obs_dim,), 1.0, dtype=np.float32)
-        wind_bound = float(max(1.0, abs(self.wind_x), abs(self.wind_y)))
-        low[-2:] = -wind_bound
-        high[-2:] = wind_bound
+        obs_dim = self.obs_step_dim * self.stack_n
+        low = np.zeros((obs_dim,), dtype=np.float32)
+        high = np.ones((obs_dim,), dtype=np.float32)
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32)
 
         self._obs_buf = np.zeros((self.stack_n, self.obs_step_dim), dtype=np.float32)
@@ -95,7 +90,7 @@ class OdorHoldEnv(gym.Env):
         self.y = 0.0
         self.th = 0.0
 
-        # CAST internals: L/L/R/R
+        # CAST internals: L/R/L/R
         self.in_cast = False
         self.cast_phase = 0
         self._scan_dirs = np.array([np.pi / 2, -np.pi / 2], dtype=np.float32)  # L, R
@@ -164,8 +159,7 @@ class OdorHoldEnv(gym.Env):
         self._obs_buf[-1] = row
 
     def _get_obs(self):
-        base = self._obs_buf.reshape(-1).copy()
-        return np.concatenate([base, self._wind_obs], axis=0)
+        return self._obs_buf.reshape(-1).copy()
 
     def reset(self, seed=None, options=None):
         if seed is not None:

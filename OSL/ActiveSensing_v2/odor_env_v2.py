@@ -77,7 +77,7 @@ class OdorHoldEnv(gym.Env):
         self.y = 0.0
         self.th = 0.0
 
-        # CAST internals: L/L/R/R
+        # CAST internals: L/R/L/R
         self.in_cast = False
         self.cast_phase = 0
         self._scan_dirs = np.array([np.pi / 2, -np.pi / 2], dtype=np.float32)  # L, R
