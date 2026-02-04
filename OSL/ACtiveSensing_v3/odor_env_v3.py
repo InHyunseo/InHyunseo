@@ -1,6 +1,7 @@
 # odor_env_v3.py (OdorHold-v3) - Wind-shaped plume, no wind sensor in obs
-# - action: 0=RUN, 1=CAST(start)
-# - CAST auto-completes L/R/L/R (4 steps) while agent sees no phi-label
+# - action: 0=RUN, 1=CAST(start), 2=TURN_L, 3=TURN_R
+# CAST는 L/R/L/R 4스텝 자동 수행
+# CAST 완료 직후 need_turn 상태가 되고, 그때만 TURN_L/R 1회 선택 가능
 # - obs per step: [c, mode], stacked
 
 import numpy as np
@@ -18,7 +19,7 @@ class OdorHoldEnv(gym.Env):
         dt=0.1,
         v_fixed=0.25,
 
-        wind_x=1.0,
+        wind_x=0.0,
         wind_y=0.0,
 
         sensor_offset=0.08,
@@ -36,8 +37,8 @@ class OdorHoldEnv(gym.Env):
         sensor_noise=0.01,
 
         scan_penalty=0.01,     # per CAST step cost
-        cast_turn=0.6,         # heading change after CAST completes (radians)
-        delta_deadband=0.0,    # if |delta| <= deadband, don't turn
+        turn_penalty=0.01,      # per TURN action cost
+        cast_turn=0.3,         # heading change after CAST completes (radians)
     ):
         super().__init__()
         self.render_mode = render_mode
@@ -53,7 +54,7 @@ class OdorHoldEnv(gym.Env):
         if self._wind_mag > 1e-6:
             self._wind_dir = (self.wind_x / self._wind_mag, self.wind_y / self._wind_mag)
         else:
-            self._wind_dir = (1.0, 0.0)
+            self._wind_dir = (0.0, 0.0)
 
         self.sigma_c = float(sigma_c)
         self.sigma_r = float(sigma_r)
@@ -68,11 +69,13 @@ class OdorHoldEnv(gym.Env):
         self.sensor_noise = float(sensor_noise)
 
         self.scan_penalty = float(scan_penalty)
+        self.turn_penalty = float(turn_penalty)
         self.cast_turn = float(cast_turn)
-        self.delta_deadband = float(delta_deadband)
 
         # action: 0 RUN, 1 CAST
-        self.action_space = spaces.Discrete(2)
+        # self.action_space = spaces.Discrete(2)
+        self.action_space = spaces.Discrete(4) # RUN, CAST, Turn_L, Turn_R
+        self.need_turn = False # CAST 후에만 True
 
         # obs per step: [c, mode] (NO phi label)
         self.obs_step_dim = 2
@@ -179,6 +182,7 @@ class OdorHoldEnv(gym.Env):
 
         self.in_cast = False
         self.cast_phase = 0
+        self.need_turn = False # CAST 후에만 True 추가
         self._scan_c[:] = 0.0
         self._last_scan_delta = 0.0
         self._last_scan_meanL = 0.0
@@ -221,15 +225,13 @@ class OdorHoldEnv(gym.Env):
             self._last_scan_meanL = meanL
             self._last_scan_meanR = meanR
             self._last_scan_delta = delta
-
-            # reorient heading toward higher side
-            if abs(delta) > self.delta_deadband:
-                self.th = self._norm_angle(self.th + (self.cast_turn if delta > 0 else -self.cast_turn))
-
             # exit cast
             self.in_cast = False
             self.cast_phase = 0
             self._scan_c[:] = 0.0
+
+            # <-- 추가: cast 끝나면 turn 1회 선택해야 함
+            self.need_turn = True
 
         return float(c), finished
 
@@ -237,55 +239,121 @@ class OdorHoldEnv(gym.Env):
         self._step += 1
         a = int(action)
 
-        # If currently casting, auto-finish cast regardless of action
+        did_scan = False
+        did_turn = False
+        invalid = False
+        moved = False
+
+        # -------------------------
+        # 1) CAST 진행 중이면 action 무시하고 auto cast
+        # -------------------------
         if self.in_cast:
             mode = 1
-            c, cast_done = self._cast_step()
-            moved = False
+            c, _ = self._cast_step()
+            did_scan = True
+            # moved stays False
+
         else:
-            if a == 1:
-                # start CAST and do first scan step immediately
-                self.in_cast = True
-                self.cast_phase = 0
-                self._scan_c[:] = 0.0
-                mode = 1
-                c, cast_done = self._cast_step()
-                moved = False
+            # -------------------------
+            # 2) CAST 완료 직후: TURN 1회만 허용
+            # -------------------------
+            if self.need_turn:
+                if a == 2:
+                    # TURN_L
+                    self.th = self._norm_angle(self.th + self.cast_turn)
+                    self.need_turn = False
+                    did_turn = True
+
+                    self._render_scan_idx = 0
+                    self._render_mode = 0
+                    c = self._sense(0.0)
+                    self._push_obs(c, mode=0)  # turn 이후 run 상태로
+                    mode = 0
+
+                elif a == 3:
+                    # TURN_R
+                    self.th = self._norm_angle(self.th - self.cast_turn)
+                    self.need_turn = False
+                    did_turn = True
+
+                    self._render_scan_idx = 0
+                    self._render_mode = 0
+                    c = self._sense(0.0)
+                    self._push_obs(c, mode=0)
+                    mode = 0
+
+                else:
+                    # RUN/CAST는 무효: obs를 밀지 않아 cast stack이 유지되게 함
+                    invalid = True
+                    _render_mode = 0
+                    _render_scan_idx = 0
+                    mode = 1  # "아직 decision 상태"로 취급(관측에는 변화 없음)
+                    c = float(self._obs_buf[-1, 0])  # 마지막 관측 농도 값 재사용
+
             else:
-                # RUN: move forward (no explicit turning action)
-                mode = 0
-                self.x += self.v * np.cos(self.th) * self.dt
-                self.y += self.v * np.sin(self.th) * self.dt
+                # -------------------------
+                # 3) 일반 상태: RUN 또는 CAST 시작만 유효
+                # -------------------------
+                if a == 1:
+                    # start CAST and do first scan immediately
+                    self.in_cast = True
+                    self.cast_phase = 0
+                    self._scan_c[:] = 0.0
+                    mode = 1
+                    c, _ = self._cast_step()
+                    did_scan = True
 
-                self._render_scan_idx = 0
-                self._render_mode = 0
+                elif a == 0:
+                    # RUN
+                    mode = 0
+                    self.x += self.v * np.cos(self.th) * self.dt
+                    self.y += self.v * np.sin(self.th) * self.dt
 
-                c = self._sense(0.0)
-                self._push_obs(c, mode=0)
-                moved = True
+                    self._render_scan_idx = 0
+                    self._render_mode = 0
 
+                    c = self._sense(0.0)
+                    self._push_obs(c, mode=0)
+                    moved = True
+
+                else:
+                    # TURN_L/R는 무효 (cast 직후에만 허용)
+                    invalid = True
+                    mode = 0
+                    c = float(self._obs_buf[-1, 0])  # obs 유지(밀지 않음)
+
+        # -------------------------
+        # termination / truncation
+        # -------------------------
         oob = (abs(self.x) > self.L) or (abs(self.y) > self.L)
         terminated = bool(oob)
         truncated = bool(self._step >= self.max_steps)
 
         d = float(np.hypot(self.x, self.y))
 
+
         # reward
         r = float(np.exp(-d / self.sigma_r))
         if d < self.r_goal:
             r += self.b_hold
-        if mode == 1:
+        if did_scan:
             r -= self.scan_penalty
+        if did_turn or invalid:
+            r -= self.turn_penalty
         if oob:
             r -= self.b_oob
 
         info = {
             "d": d,
             "c": float(c),
-            "mode": int(mode),           # 0 RUN, 1 CAST
+            "mode": int(mode),           # 0 RUN, 1 CAST/decision
             "in_cast": int(self.in_cast),
+            "need_turn": int(self.need_turn),   # <-- 추가
             "cast_phase": int(self.cast_phase),
             "moved": int(moved),
+            "did_scan": int(did_scan),          # <-- 추가
+            "did_turn": int(did_turn),          # <-- 추가
+            "invalid": int(invalid),            # <-- 추가
             "scan_meanL": float(self._last_scan_meanL),
             "scan_meanR": float(self._last_scan_meanR),
             "scan_delta": float(self._last_scan_delta),

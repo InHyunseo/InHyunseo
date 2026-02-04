@@ -583,8 +583,8 @@ if __name__ == "__main__":
     p.add_argument("--sensor-noise", type=float, default=0.01)
         # --- CLI args 추가 ---
     p.add_argument("--scan-penalty", type=float, default=0.01)
+    p.add_argument("--turn-penalty", type=float, default=0.01)
     p.add_argument("--cast-turn", type=float, default=0.6)
-    p.add_argument("--delta-deadband", type=float, default=0.0)
     p.add_argument("--wind-x", type=float, default=1.0)
     p.add_argument("--wind-y", type=float, default=0.0)
 
@@ -623,8 +623,8 @@ if __name__ == "__main__":
     env_kwargs = dict(
         sensor_noise=args.sensor_noise,
         scan_penalty=args.scan_penalty,
+        turn_penalty=args.turn_penalty, # 추가
         cast_turn=args.cast_turn,
-        delta_deadband=args.delta_deadband,
     )
     if args.env_id.endswith("-v3") or ("odor_env_v3" in args.entry_point):
         env_kwargs["wind_x"] = args.wind_x
