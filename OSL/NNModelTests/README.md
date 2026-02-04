@@ -46,10 +46,10 @@
 
 ## 실행 요약
 
-- **1번**: `train.py` (또는 `train_MLP.py`) + `--stack-n 4`
-- **2번**: `train.py` + `--stack-n 1`
-- **3번**: `train_rnn.py` + `--stack-n 1` + `--seq-len <T>`
-
+- **1번**: `train_MLP.py`  + `--stack-n 4`
+- **2번**: `train_MLP.py` + `--stack-n 1`(디폴트가 1 이라서 입력 안해줘도 됨) + `--run-name <name>` + `wind-x: <-1~1사이>` + `wind-y: <-1~1 사이>`
+- **3번**: `train_rnn.py` + `--stack-n 1`(디폴트가 1 이라서 입력 안해줘도 됨) + `--seq-len <T>`
+- 기본적으로 `.py`만 실행하면 바람 없는 중앙 소스 환경에서 실행됨.
 평가/시각화는 공통으로:
 ```bash
 python eval.py --run_dir runs/<RUN_NAME> --episodes 30 --seed_base 100000
