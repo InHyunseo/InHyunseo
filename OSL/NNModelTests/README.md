@@ -1,4 +1,3 @@
-````md
 # NNModelTests
 
 `OdorHold-v3` 환경에서 **신경망 구조/메모리 방식**을 바꿔가며 성능을 비교하는 실험 폴더입니다.  
@@ -65,6 +64,3 @@ python eval.py --run_dir runs/<RUN_NAME> --episodes 30 --seed_base 100000
 * `config.json`, `metrics.csv`, `metrics_eval.csv`
 * `checkpoints/ (init/best/final)`
 * `plots/`, `media/` (gif, trajectory png 등)
-
-```
-```
