@@ -577,7 +577,7 @@ Chain rule을 적용하면,
 
 ```math
 \frac{\partial s}{\partial h} = u^T,\qquad
-\frac{\partial h}{\partial z} = \operatorname{diag}(f'(z)),\qquad
+\frac{\partial h}{\partial z} = D_{f'(z)},\qquad
 \frac{\partial z}{\partial b} = I
 ```
 
@@ -586,13 +586,13 @@ Chain rule을 적용하면,
 ```math
 \begin{aligned}
 \frac{\partial s}{\partial b}
-&= u^T \operatorname{diag}(f'(z)) I \\
-&= u^T \operatorname{diag}(f'(z)) \\
+&= u^T D_{f'(z)} I \\
+&= u^T D_{f'(z)} \\
 &= u^T \odot f'(z)
 \end{aligned}
 ```
 
-여기서 $\odot$는 Hadamard product(원소별 곱)이다. 즉, 각 bias 성분에 대한 민감도는 해당 hidden unit이 출력에 미치는 영향 $u$와 activation의 국소 기울기 $f'(z)$의 원소별 곱으로 표현된다.
+여기서 $D_{f'(z)}$는 대각 원소가 $f'(z)$인 diagonal matrix이고, $\odot$는 Hadamard product(원소별 곱)이다. 즉, 각 bias 성분에 대한 민감도는 해당 hidden unit이 출력에 미치는 영향 $u$와 activation의 국소 기울기 $f'(z)$의 원소별 곱으로 표현된다.
 
 ### [수식] Q12. Backpropagation의 forward/backward pass 절차를 서술하고, backward pass에서 오른쪽부터 계산하는 것이 왜 효율적인지 설명하시오.
 
