@@ -37,3 +37,6 @@ Figure_1/
 
 *.gif
 runs/
+
+*.codex
+*.claude
