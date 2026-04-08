@@ -97,42 +97,57 @@ LDA의 가정은 첫째, 각 클래스 집단이 정규분포(normal distributio
 
 2. **Step 2: 최적화 문제 정의**
    센터링된 데이터 `X`를 기저 벡터 `w`에 사영(projection)하면, 사영 후 분산 `V`는 다음과 같다.
+
    ```math
    V = \frac{1}{n}(w^T X)(w^T X)^T = \frac{1}{n}w^T XX^T w = w^T Sw
    ```
+
    여기서 $S = \frac{1}{n}XX^T$는 `X`의 공분산 행렬(covariance matrix)이다. PCA의 목적은 사영 후 분산 `V`를 최대화하는 것이므로, 최적화 문제는 다음과 같이 정의된다.
+
    ```math
-   \max \; w^T S w,\qquad \text{s.t. } w^T w = 1
+   \max \; w^T S w,\ s.t.\ w^T w = 1
    ```
+
    $w^T w = 1$ 제약 조건은 기저 벡터의 크기를 1로 고정하여 분산 최대화가 방향에 의해서만 결정되도록 한다.
 
 3. **Step 3: 라그랑지 멀티플라이어를 통한 풀이**
    제약 조건부 최적화를 위해 라그랑지안 함수를 구성한다.
+
    ```math
    L = w^T S w - \lambda (w^T w - 1)
    ```
+
    `L`을 `w`에 대해 편미분하여 0으로 놓으면 다음과 같다.
+
    ```math
-   \frac{\partial L}{\partial w} = 0 \;\Rightarrow\; Sw - \lambda w = 0 \;\Rightarrow\; (S - \lambda I)w = 0
+   \frac{\partial L}{\partial w} = 0 \Rightarrow Sw - \lambda w = 0 \Rightarrow (S - \lambda I)w = 0
    ```
+
    이는 고유값 분해(eigenvalue decomposition) 문제로, $w$는 공분산 행렬 $S$의 고유벡터(eigenvector), $\lambda$는 대응하는 고유값(eigenvalue)이 된다.
 
 4. **Step 4: 주축 정렬**
    구한 고유값을 크기 순서대로 정렬하고, 가장 큰 고유값에 대응하는 고유벡터를 첫 번째 주성분으로 선택한다. $w_1$에 사영된 데이터의 분산은 해당 고유값 $\lambda_1$과 같다.
+
    ```math
    v = w_1^T S w_1 = w_1^T (\lambda_1 w_1) = \lambda_1 w_1^T w_1 = \lambda_1
    ```
+
 5. **Step 5: 데이터 변환**
    원 데이터 $X$에 선택된 고유벡터 $W_1$을 곱하여 주성분 $Z_1$을 얻는다.
+
    ```math
    Z_1 = W_1^T X
    ```
+
 6. **Step 6: 원데이터 복원 (Reconstruction)**
    축소된 데이터를 다시 원래 차원으로 복원할 수 있다.
+
    ```math
-   X \rightarrow w^T X \; (\text{Projection}) \rightarrow ww^T X \; (\text{Reconstruction})
+   X \rightarrow w^T X \rightarrow ww^T X
    ```
+
    복원된 데이터 `X'`는 원본과 완전히 동일하지는 않으며, 선택하지 않은 주성분의 정보만큼 손실이 발생한다. 첫 번째 주성분만으로 설명 가능한 데이터 비율은 다음과 같다.
+
    ```math
    \frac{\lambda_1}{\lambda_1 + \lambda_2 + \cdots + \lambda_n}
    ```
