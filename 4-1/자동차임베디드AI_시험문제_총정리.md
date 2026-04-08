@@ -501,7 +501,7 @@ k^2 \gamma^2 / 4 &\le kR^2 \\
 \end{aligned}
 ```
 
-따라서 퍼셉트론은 최대 $ \lfloor 4R^2 / \gamma^2 \rfloor $회 이내의 업데이트 후 수렴하며, 결국 모든 학습 샘플을 정확히 분류하는 해를 찾는다.
+따라서 퍼셉트론은 최대 ⌊4R²/γ²⌋회 이내의 업데이트 후 수렴하며, 결국 모든 학습 샘플을 정확히 분류하는 해를 찾는다.
 
 ### [수식] Q8. Logistic Regression을 network 관점에서 표현할 때, 입력 (GPA=3.8, Experience=1.2)에 대해 $P(Y=1)$의 계산 과정을 서술하시오. (coefficients: $\beta_0=0.4$, $\beta_1=0.2$, $\beta_2=0.5$)
 
