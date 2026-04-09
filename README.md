@@ -24,23 +24,6 @@
 ---
 
 ## 🔬 Research Interests
-* **Bio-inspired Robotics:** 생체 친화적 / 뇌모방 로보틱스 기술
-* **AI-Vision Systems:** 객체인식 알고리즘과 실시간 처리 시스템
-* **Dynamics-based Software:** sim-to-real, 동역학 기반의 제어 알고리즘
-
-## 🛠️ Technical Experiences
-
-### 💻 Languages & Computation
-<img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white"> <img src="https://img.shields.io/badge/C-A8B9CC?style=for-the-badge&logo=c&logoColor=white"> <img src="https://img.shields.io/badge/MATLAB-e67e22?style=for-the-badge&logo=mathworks&logoColor=white"> <img src="https://img.shields.io/badge/Simulink-0076A8?style=for-the-badge&logo=mathworks&logoColor=white">
-
-### 🤖 Robotics & Autonomous Driving
-<img src="https://img.shields.io/badge/ROS2-22314E?style=for-the-badge&logo=ros&logoColor=white"> <img src="https://img.shields.io/badge/Gazebo-FF6F00?style=for-the-badge&logo=gazebo&logoColor=white"> 
-
-### 👁 Vision & Object Detection
-<img src="https://img.shields.io/badge/OpenCV-5C3EE8?style=for-the-badge&logo=opencv&logoColor=white"> <img src="https://img.shields.io/badge/YOLO-00FFFF?style=for-the-badge&logo=yolo&logoColor=black">  <img src="https://img.shields.io/badge/Mediapipe-009688?style=for-the-badge&logo=google&logoColor=white">
-
-### ⚙️ Hardware & Embedded
-<img src="https://img.shields.io/badge/NVIDIA Jetson-76B900?style=for-the-badge&logo=nvidia&logoColor=white"> <img src="https://img.shields.io/badge/Raspberry Pi-C51A4A?style=for-the-badge&logo=raspberrypi&logoColor=white"> <img src="https://img.shields.io/badge/MSP430-FF0000?style=for-the-badge&logo=texasinstruments&logoColor=white"> <img src="https://img.shields.io/badge/ATmega128-000000?style=for-the-badge&logo=atmel&logoColor=white"> <img src="https://img.shields.io/badge/PCB Design-success?style=for-the-badge">
-
-### 📚 AI & Neuroscience Research
-<img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white"> <img src="https://img.shields.io/badge/Neuroscience-800080?style=for-the-badge"> <img src="https://img.shields.io/badge/Connectome%20Analysis-009688?style=for-the-badge">
+* **Brain-inspired AI system:** 뇌모방 인공지능
+* **Automotive system:** 자율주행, 자율지능 시스템
+* **System E2E design:** 통합 시스템 프로토타입 개발
