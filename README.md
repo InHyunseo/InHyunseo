@@ -4,7 +4,8 @@
 ### 🚗 Autonomous Systems & Robotics
 | Project | Description & Tech |
 | :--- | :--- |
-| **Odor Source Localization Robot** <br> _(Python, ROS2)_ | • 난류 환경에서의 냄새 추적 강화학습 알고리즘 <br> • 센서 퓨전 <br> • Bio-inspired robotics |
+| **Odor Source Localization Robot (졸업 프로젝트)** <br> _(Python, C++, ROS2, linux)_ | • 난류 환경에서의 냄새 추적 강화학습 알고리즘 <br> • 센서 퓨전 <br> • Bio-inspired robotics |
+| **E2E AV (전공프로젝트)** <br> _(Python, C++, ROS2, linux)_ | • 딥러닝 기반의 인지-판단-제어 단일 신경망 E2E AI Vehicle <br> • 소형차량 주행 <br> • Embedded AI |
 
 ## Previous Projects
 ### 🚗 Autonomous Systems & Robotics
@@ -25,5 +26,5 @@
 
 ## 🔬 Research Interests
 * **Brain-inspired AI system:** 뇌모방 인공지능
-* **Automotive system:** 자율주행, 자율지능 시스템
+* **E2E AI Automotive system:** 자율주행, 자율지능 시스템
 * **System E2E design:** 통합 시스템 프로토타입 개발
