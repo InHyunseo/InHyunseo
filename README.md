@@ -4,8 +4,8 @@
 ### 🚗 Autonomous Systems & Robotics
 | Period | Project | Description & Tech |
 | :--- | :--- | :--- |
-| 2026 <br> 상반기 | E2E Autonomous Driving AI <br> _(Python, C++, ROS2, PyTorch, TensorRT, Jetson Orin Nano)_ | • 차선 주행 및 정지 차량 회피·추월 E2E 모델 <br> • Multi-head, multi-task single E2E image-to-steer network |
 | 2026 <br> 상반기 | Inner Path Safety Verification Framework <br> _(Python, MATLAB/Simulink, PyTorch, MoE, SNN)_ | • 조건부 활성화 AI의 내부 경로 안전 검증 프레임워크 <br> • APDA/APDM/APST/APIM 및 TAR index 설계 |
+| 2026 <br> 상반기 | H-Mobility Class 자율주행 트랙 <br> _(차량 전반 이해, 제어 이론)_ | • 카인사이드아웃: 차량 전반, 부품 <br> • 자율주행-제어: 제어 이론 및 상태 함수  |
 
 ### 💻 Programming & Community
 | Period | Project | Description & Tech |
@@ -17,6 +17,7 @@
 ### 🚗 Autonomous Systems & Robotics
 | Period | Project | Description & Tech |
 | :--- | :--- | :--- |
+| 2026 <br> 상반기 | E2E Autonomous Driving AI <br> _(Python, C++, ROS2, PyTorch, TensorRT, Jetson Orin Nano)_ | • 차선 주행 및 정지 차량 회피·추월 E2E 모델 <br> • Multi-head, multi-task single E2E image-to-steer network |
 | 2025 <br> 상반기 | Grid-based Automotive Algorithms <br> _(Simulink)_ | • A* path planning and a Pure Pursuit/PID control-based system |
 | 2025 <br> 하반기 | 2025 Mobility Challenge: CAV Cooperative Driving <br> _(C++, Python, ROS2)_ | • CAV 교차로/합류 협력주행 알고리즘 <br> • Conflict Zone, ETA, V2V 기반 우선순위·양보 로직 |
 
