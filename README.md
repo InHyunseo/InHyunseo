@@ -18,18 +18,18 @@
 | Period | Project | Description & Tech |
 | :--- | :--- | :--- |
 | 2026 <br> 상반기 | E2E Autonomous Driving AI <br> _(Python, C++, ROS2, PyTorch, TensorRT, Jetson Orin Nano)_ | • 차선 주행 및 정지 차량 회피·추월 E2E 모델 <br> • Multi-head, multi-task single E2E image-to-steer network |
+| 2025 <br> 하반기 | 2025 Mobility Challenge: CAV Cooperative Driving <br> _(C++, Python, ROS2)_ | • CAV 교차로/합류 협력주행 알고리즘 <br> • Conflict Zone, ETA, V2V 기반 우선순위·양보 로직 <br> • 🏅 **KAIST 2025 Mobility Challenge 본선진출상 수상** |
 | 2025 <br> 상반기 | Grid-based Automotive Algorithms <br> _(Simulink)_ | • A* path planning and a Pure Pursuit/PID control-based system |
-| 2025 <br> 하반기 | 2025 Mobility Challenge: CAV Cooperative Driving <br> _(C++, Python, ROS2)_ | • CAV 교차로/합류 협력주행 알고리즘 <br> • Conflict Zone, ETA, V2V 기반 우선순위·양보 로직 |
 
 ### 🧠 AI Research & Bio-inspired Learning
 | Period | Project | Description & Tech |
 | :--- | :--- | :--- |
 | 2026 <br> 상반기 | Scene-Conditional Dynamic Mask Networks — CIFAR Validation <br> _(PyTorch, ResNet18, CIFAR-10-C)_ | • Scene-conditioned channel mask 구조 검증 <br> • gate/probe/mask-IoU 분석 및 CIFAR negative result 도출 |
 | 2026 <br> 상반기 | Scene-Conditional Dynamic Mask Networks — Driving-scale Validation <br> _(PyTorch, ResNet18, comma2k19)_ | • comma2k19 기반 driving-scale SCDMN 검증 <br> • day/overcast/night context steering regression |
-| 2026 <br> 상반기 | Odor Source Localization (Larva Connectome RL) <br> _(Python, PyTorch, Gymnasium, PPO/SAC, Connectome)_ | • 양측 냄새 센서 기반 odor source localization RL <br> • active sensing 행동의 dynamics/probe/ablation 분석 |
-| 2025 <br> 상하반기 | Connectome-based AI for Drosophila <br> _(PyTorch, DoOR, Connectome)_ | • 초파리 후각 커넥톰 기반 냄새 분류 AI <br> • MLP/RNN/reservoir 모델 튜닝 및 비교 |
+| 2026 <br> 상반기 | Odor Source Localization (Larva Connectome RL) <br> _(Python, PyTorch, Gymnasium, PPO/SAC, Connectome)_ | • 양측 냄새 센서 기반 odor source localization RL <br> • active sensing 행동의 dynamics/probe/ablation 분석 <br> • 🏆 **BME Graduation Project — 3rd Place** |
+| 2025 <br> 상·하반기 | Connectome-based AI for Drosophila <br> _(PyTorch, DoOR, Connectome)_ | • 초파리 후각 커넥톰 기반 냄새 분류 AI <br> • MLP/RNN/reservoir 모델 튜닝 및 비교 |
 
-### 🧠 Bioengineering & Embedded Systems
+### 🔌 Bioengineering & Embedded Systems
 | Period | Project | Description & Tech |
 | :--- | :--- | :--- |
 | 2025 <br> 하반기 | Smart Goggles <br> _(MSP430, YOLO)_ | • EOG 기반 포인터 + 객체 인식 AI <br> • EOG AFE 회로/PCB 설계 및 YOLOv8n 적용 |
