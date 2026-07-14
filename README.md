@@ -4,26 +4,33 @@
 ### 🚗 Autonomous Systems & Robotics
 | Period | Project | Description & Tech |
 | :--- | :--- | :--- |
-| 2026 <br> 상반기 | Inner Path Safety Verification Framework <br> _(Python, MATLAB/Simulink, PyTorch, MoE, SNN)_ | • 조건부 활성화 AI의 내부 경로 안전 검증 프레임워크 <br> • APDA/APDM/APST/APIM 및 TAR index 설계 |
-| 2026 <br> 상반기 | H-Mobility Class 자율주행 트랙 <br> _(차량 전반 이해, 제어 이론)_ | • 카인사이드아웃: 차량 전반, 부품 <br> • 자율주행-제어: 제어 이론 및 상태 함수  |
+| 2026 <br> 여름방학 | AILAB Summer Internship <br> _(C++, PyTorch, ROS2, CARLA, Optimal State Estimation)_ | • 선형시스템·확률론, C++, Deep Learning, ROS2 집중 학습 <br> • CARLA 도심 환경의 Fully ML 기반 Mid-to-Mid 자율주행 팀 프로젝트 <br> • GT perception, ML decision–control 및 ROS2 기반 시스템 통합 |
+
+### 🧠 AI Research & Deep Learning
+| Period | Project | Description & Tech |
+| :--- | :--- | :--- |
+| 2026 <br> 여름방학 | Class-Conditional Attention for Overlapping Digit Recognition <br> _(Python, PyTorch, CNN, Spatial Attention)_ | • 두 MNIST 숫자의 겹침 강도에 따른 Top-2 인식 성능 분석 <br> • LeNet, shared attention, class-conditional attention 비교 <br> • Hierarchical bootstrap과 attention 정렬·selectivity 평가 |
 
 ### 💻 Programming & Community
 | Period | Project | Description & Tech |
 | :--- | :--- | :--- |
-| 2026 <br> 상반기 | Algorithm Problem Solving Open Chat <br> _(C++, Python)_ | • C++ 중심 LeetCode-style 알고리즘 문제풀이 오픈채팅방 운영 |
-| 2025 <br> 하반기 | 사미용두(SMYD) 자율주행/로보틱스 수도권 연합 학술동아리 운영진 <br> _(Python, ROS2, MATLAB, Simulink)_ | • 자율주행/로보틱스 학술동아리 운영진 <br> • ROS2, Python, MATLAB/Simulink 스터디·프로젝트 운영 |
+| 2026–현재 | Algorithm Problem Solving Open Chat <br> _(C++, Python)_ | • C++ 중심 LeetCode-style 알고리즘 문제풀이 오픈채팅방 운영 |
+| 2025–현재 | 사미용두(SMYD) 자율주행/로보틱스 수도권 연합 학술동아리 운영진 <br> _(Python, ROS2, MATLAB, Simulink)_ | • 자율주행/로보틱스 학술동아리 운영진 <br> • ROS2, Python, MATLAB/Simulink 스터디·프로젝트 운영 및 지도 |
 
 ## Previous Projects
 ### 🚗 Autonomous Systems & Robotics
 | Period | Project | Description & Tech |
 | :--- | :--- | :--- |
+| 2026 <br> 상반기 | Inner Path Safety Verification Framework <br> _(Python, MATLAB/Simulink, PyTorch, MoE, SNN)_ | • 조건부 활성화 AI의 내부 경로 안전 검증 프레임워크 <br> • APDA/APDM/APST/APIM 및 TAR index 설계 <br> • 연구 수행 완료, 최종 결과 발표 대기 |
+| 2026 <br> 상반기 | H-Mobility Class 자율주행 트랙 <br> _(차량 시스템, 제어 이론)_ | • 차량 구조·부품 및 자율주행 제어 이론 학습 <br> • 상태공간 모델과 제어 시스템 과정 수료 |
 | 2026 <br> 상반기 | E2E Autonomous Driving AI <br> _(Python, C++, ROS2, PyTorch, TensorRT, Jetson Orin Nano)_ | • 차선 주행 및 정지 차량 회피·추월 E2E 모델 <br> • Multi-head, multi-task single E2E image-to-steer network |
 | 2025 <br> 하반기 | 2025 Mobility Challenge: CAV Cooperative Driving <br> _(C++, Python, ROS2)_ | • CAV 교차로/합류 협력주행 알고리즘 <br> • Conflict Zone, ETA, V2V 기반 우선순위·양보 로직 <br> • 🏅 **KAIST 2025 Mobility Challenge 본선진출상 수상** |
 | 2025 <br> 상반기 | Grid-based Automotive Algorithms <br> _(Simulink)_ | • A* path planning and a Pure Pursuit/PID control-based system |
 
-### 🧠 AI Research & Bio-inspired Learning
+### 🧠 AI Research & Deep Learning
 | Period | Project | Description & Tech |
 | :--- | :--- | :--- |
+| 2026 <br> 여름방학 | Fixed-Length Digit Sequence Recognition and Cross-Runtime Inference <br> _(Python, C++, PyTorch, ONNX Runtime)_ | • 단일 숫자에서 고정 3자리 sequence 인식으로 확장 <br> • PyTorch, Python ONNX, C++ ONNX prediction fidelity 및 latency 비교 <br> • 고정 길이 baseline 완료, 가변 길이 attention decoding 후속 연구 필요 |
 | 2026 <br> 상반기 | Scene-Conditional Dynamic Mask Networks — CIFAR Validation <br> _(PyTorch, ResNet18, CIFAR-10-C)_ | • Scene-conditioned channel mask 구조 검증 <br> • gate/probe/mask-IoU 분석 및 CIFAR negative result 도출 |
 | 2026 <br> 상반기 | Scene-Conditional Dynamic Mask Networks — Driving-scale Validation <br> _(PyTorch, ResNet18, comma2k19)_ | • comma2k19 기반 driving-scale SCDMN 검증 <br> • day/overcast/night context steering regression |
 | 2026 <br> 상반기 | Odor Source Localization (Larva Connectome RL) <br> _(Python, PyTorch, Gymnasium, PPO/SAC, Connectome)_ | • 양측 냄새 센서 기반 odor source localization RL <br> • active sensing 행동의 dynamics/probe/ablation 분석 <br> • 🏆 **BME Graduation Project — 3rd Place** |
@@ -36,6 +43,7 @@
 | 2025 <br> 하반기 | AI Home Training <br> _(Jetson Orin, BlazePose)_ | • 실시간 관절점 기반 자세 교정 디바이스 <br> • Jetson Orin + TensorRT 기반 다인용 처리 |
 | 2025 <br> 상반기 | Neural Stimulation <br> _(Research)_ | • 정전류 자극기 및 DC-DC converter 아날로그 회로 설계 및 in vivo 실험 <br> • 자극 안전성(Safety), Focality, Steerability 분석 및 시뮬레이션 |
 | 2025 <br> 상반기 | Embedded & Analog Circuits <br> _(ATmega128, LTspice, PCB)_ | • ATmega128 미니카 및 아날로그 회로 설계 <br> • PCB 납땜/검증, LTspice 및 전자계측 장비 활용 |
+
 ---
 
 ## 🔬 Research Interests
