@@ -9,7 +9,7 @@
 ### 🧠 AI Research & Deep Learning
 | Period | Project | Description & Tech |
 | :--- | :--- | :--- |
-| 2026 <br> 여름방학 | Class-Conditional Attention for Overlapping Digit Recognition <br> _(Python, PyTorch, CNN, Spatial Attention)_ | • 두 MNIST 숫자의 겹침 강도에 따른 Top-2 인식 성능 분석 <br> • LeNet, shared attention, class-conditional attention 비교 <br> • Hierarchical bootstrap과 attention 정렬·selectivity 평가 |
+| 2026 <br> 여름방학 | MNIST Recognition Research <br> _(Python, C++, PyTorch, ONNX Runtime, CNN, Attention, Multitask Learning)_ | • 단일 숫자에서 고정 3자리 sequence 및 겹친 두 숫자 Top-2 인식으로 문제 확장 <br> • Controlled overlap에서 LeNet·spatial attention 비교와 10-seed reconstruction multitask 실험 진행 <br> • Hierarchical bootstrap, attention 정렬 분석 및 PyTorch·ONNX·C++ 추론 일치도·latency 검증 |
 
 ### 💻 Programming & Community
 | Period | Project | Description & Tech |
@@ -30,7 +30,6 @@
 ### 🧠 AI Research & Deep Learning
 | Period | Project | Description & Tech |
 | :--- | :--- | :--- |
-| 2026 <br> 여름방학 | Fixed-Length Digit Sequence Recognition and Cross-Runtime Inference <br> _(Python, C++, PyTorch, ONNX Runtime)_ | • 단일 숫자에서 고정 3자리 sequence 인식으로 확장 <br> • PyTorch, Python ONNX, C++ ONNX prediction fidelity 및 latency 비교 <br> • 고정 길이 baseline 완료, 가변 길이 attention decoding 후속 연구 필요 |
 | 2026 <br> 상반기 | Scene-Conditional Dynamic Mask Networks — CIFAR Validation <br> _(PyTorch, ResNet18, CIFAR-10-C)_ | • Scene-conditioned channel mask 구조 검증 <br> • gate/probe/mask-IoU 분석 및 CIFAR negative result 도출 |
 | 2026 <br> 상반기 | Scene-Conditional Dynamic Mask Networks — Driving-scale Validation <br> _(PyTorch, ResNet18, comma2k19)_ | • comma2k19 기반 driving-scale SCDMN 검증 <br> • day/overcast/night context steering regression |
 | 2026 <br> 상반기 | Odor Source Localization (Larva Connectome RL) <br> _(Python, PyTorch, Gymnasium, PPO/SAC, Connectome)_ | • 양측 냄새 센서 기반 odor source localization RL <br> • active sensing 행동의 dynamics/probe/ablation 분석 <br> • 🏆 **BME Graduation Project — 3rd Place** |
