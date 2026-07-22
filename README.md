@@ -6,11 +6,6 @@
 | :--- | :--- | :--- |
 | 2026 <br> 여름방학 | AILAB Summer Internship <br> _(C++, PyTorch, ROS2, CARLA, Optimal State Estimation)_ | • 선형시스템·확률론, C++, Deep Learning, ROS2 집중 학습 <br> • CARLA 도심 환경의 Fully ML 기반 Mid-to-Mid 자율주행 팀 프로젝트 <br> • GT perception, ML decision–control 및 ROS2 기반 시스템 통합 |
 
-### 🧠 AI Research & Deep Learning
-| Period | Project | Description & Tech |
-| :--- | :--- | :--- |
-| 2026 <br> 여름방학 | MNIST Recognition Research <br> _(Python, C++, PyTorch, ONNX Runtime, CNN, Attention, Multitask Learning)_ | • 단일 숫자에서 고정 3자리 sequence 및 겹친 두 숫자 Top-2 인식으로 문제 확장 <br> • Controlled overlap에서 LeNet·spatial attention 비교와 10-seed reconstruction multitask 실험 진행 <br> • Hierarchical bootstrap, attention 정렬 분석 및 PyTorch·ONNX·C++ 추론 일치도·latency 검증 |
-
 ### 💻 Programming & Community
 | Period | Project | Description & Tech |
 | :--- | :--- | :--- |
@@ -30,6 +25,7 @@
 ### 🧠 AI Research & Deep Learning
 | Period | Project | Description & Tech |
 | :--- | :--- | :--- |
+| 2026 <br> 여름방학 | MNIST Recognition Research <br> _(Python, C++, PyTorch, ONNX Runtime, CNN, Attention, Multitask Learning)_ | • n-MNIST 분류에서 clean image 복원 보조 과제의 효과 검증 <br> • 겹친 두 숫자 분류에서 원본 복원 multitask learning 비교 <br> • 겹친 숫자 분류를 위한 shared·class-conditional spatial attention 비교 <br> • 고정 숫자열 인식과 PyTorch·ONNX·C++ 추론 성능 비교 |
 | 2026 <br> 상반기 | Scene-Conditional Dynamic Mask Networks — CIFAR Validation <br> _(PyTorch, ResNet18, CIFAR-10-C)_ | • Scene-conditioned channel mask 구조 검증 <br> • gate/probe/mask-IoU 분석 및 CIFAR negative result 도출 |
 | 2026 <br> 상반기 | Scene-Conditional Dynamic Mask Networks — Driving-scale Validation <br> _(PyTorch, ResNet18, comma2k19)_ | • comma2k19 기반 driving-scale SCDMN 검증 <br> • day/overcast/night context steering regression |
 | 2026 <br> 상반기 | Odor Source Localization (Larva Connectome RL) <br> _(Python, PyTorch, Gymnasium, PPO/SAC, Connectome)_ | • 양측 냄새 센서 기반 odor source localization RL <br> • active sensing 행동의 dynamics/probe/ablation 분석 <br> • 🏆 **BME Graduation Project — 3rd Place** |
