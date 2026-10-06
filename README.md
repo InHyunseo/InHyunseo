@@ -10,7 +10,7 @@
 | Period | Project | Description & Tech |
 | :--- | :--- | :--- |
 | 2026–현재 | Algorithm Problem Solving Open Chat <br> _(C++, Python)_ | • C++ 중심 LeetCode-style 알고리즘 문제풀이 오픈채팅방 운영 |
-| 2025–현재 | 사미용두(SMYD) 자율주행/로보틱스 수도권 연합 학술동아리 운영진 <br> _(Python, ROS2, MATLAB, Simulink)_ | • 자율주행/로보틱스 학술동아리 운영진 <br> • ROS2, Python, MATLAB/Simulink, AI 스터디·프로젝트 운영 및 지도 |
+| 2025–현재 | [사미용두(SMYD)](https://www.instagram.com/smydcrew/) 자율주행/로보틱스 수도권 연합 학술동아리 운영진 <br> _(Python, ROS2, MATLAB, Simulink)_ | • 자율주행/로보틱스 학술동아리 운영진 <br> • ROS2, Python, MATLAB/Simulink, AI 스터디·프로젝트 운영 및 지도 |
 
 ### 📦 Developer Tools & Deployment
 | Period | Project | Description & Tech |
