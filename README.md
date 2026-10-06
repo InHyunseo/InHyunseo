@@ -12,6 +12,11 @@
 | 2026–현재 | Algorithm Problem Solving Open Chat <br> _(C++, Python)_ | • C++ 중심 LeetCode-style 알고리즘 문제풀이 오픈채팅방 운영 |
 | 2025–현재 | 사미용두(SMYD) 자율주행/로보틱스 수도권 연합 학술동아리 운영진 <br> _(Python, ROS2, MATLAB, Simulink)_ | • 자율주행/로보틱스 학술동아리 운영진 <br> • ROS2, Python, MATLAB/Simulink, AI 스터디·프로젝트 운영 및 지도 |
 
+### 📦 Developer Tools & Deployment
+| Period | Project | Description & Tech |
+| :--- | :--- | :--- |
+| 2026 <br> 하반기 | [pdf2md-study](https://github.com/InHyunseo/pdf2md-study) <br> _(Python, Docling, uv, pytest, GitHub Actions, Docker)_ | • 논문·강의자료 PDF를 LLM 공부용 Markdown으로 바꾸는 CLI 도구 <br> • 수식·코드는 이미지로 보존, 반복 로고·참고문헌 제거 → 26쪽 논문 기준 약 5.4만 → 1.8만 토큰 <br> • CI (3 OS × 2 Python), 태그 릴리스로 PyPI·GHCR 자동 배포 (Trusted Publishing) |
+
 ## Previous Projects
 ### 🚗 Autonomous Systems & Robotics
 | Period | Project | Description & Tech |
@@ -56,6 +61,6 @@
 | Modeling & Simulation | Simulink, LTspice, JMAG, AutoCAD, Gazebo |
 | Embedded Boards | Jetson Orin NX, Jetson Orin Nano, Raspberry Pi 5 |
 | Microcontrollers | MSP430, ATmega128 |
-| Development Environment | Ubuntu/Linux, Git, Docker |
+| Development Environment | Ubuntu/Linux, Git, Docker, GitHub Actions (CI/CD) |
 | Collaboration & Documentation | Notion, Slack |
 | Hardware | PCB design, soldering, oscilloscope, function generator, power supply, digital multimeter |
