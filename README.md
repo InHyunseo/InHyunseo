@@ -22,19 +22,19 @@
 | Period | Project | Description & Tech |
 | :--- | :--- | :--- |
 | 2026 <br> 여름방학 | AILAB Summer Internship <br> _(C++, PyTorch, ROS2, CARLA, Optimal State Estimation)_ | • 선형시스템·확률론, C++, Deep Learning, ROS2 집중 학습 <br> • Bench2Drive, E2E AD 개발 팀 프로젝트 (팀장) <br> • SW architecture full design, model-planner   |
-| 2026 <br> 상반기 | Inner Path Safety Verification Framework <br> _(Python, MATLAB/Simulink, PyTorch, MoE, SNN)_ | • 조건부 활성화 AI의 내부 경로 안전 검증 프레임워크 <br> • APDA/APDM/APST/APIM 및 TAR index 설계 <br> • 연구 수행 완료, 최종 결과 발표 대기 |
+| 2026 <br> 상반기 | [Inner Path Safety Verification Framework](https://github.com/InHyunseo/tar-framework) <br> _(Python, MATLAB/Simulink, PyTorch, MoE, SNN)_ | • 조건부 활성화 AI의 내부 경로 안전 검증 프레임워크 <br> • APDA/APDM/APST/APIM 및 TAR index 설계 <br> • 연구 수행 완료, 최종 결과 발표 대기 |
 | 2026 <br> 상반기 | H-Mobility Class 자율주행 트랙 <br> _(차량 시스템, 제어 이론)_ | • 차량 구조·부품 및 자율주행 제어 이론 학습 <br> • 상태공간 모델과 제어 시스템 과정 수료 |
-| 2026 <br> 상반기 | E2E Autonomous Driving AI <br> _(Python, C++, ROS2, PyTorch, TensorRT, Jetson Orin Nano)_ | • 차선 주행 및 정지 차량 회피·추월 E2E 모델 <br> • Multi-head, multi-task single E2E image-to-steer network |
-| 2025 <br> 하반기 | 2025 Mobility Challenge: CAV Cooperative Driving <br> _(C++, Python, ROS2)_ | • CAV 교차로/합류 협력주행 알고리즘 <br> • Conflict Zone, ETA, V2V 기반 우선순위·양보 로직 <br> • 🏅 **KAIST 2025 Mobility Challenge 본선진출상 수상** |
+| 2026 <br> 상반기 | [E2E Autonomous Driving AI](https://github.com/InHyunseo/AUE4040-team-project) <br> _(Python, C++, ROS2, PyTorch, TensorRT, Jetson Orin Nano)_ | • 차선 주행 및 정지 차량 회피·추월 E2E 모델 <br> • Multi-head, multi-task single E2E image-to-steer network |
+| 2025 <br> 하반기 | [2025 Mobility Challenge: CAV Cooperative Driving](https://github.com/InHyunseo/kaist_project_smyd) <br> _(C++, Python, ROS2)_ | • CAV 교차로/합류 협력주행 알고리즘 <br> • Conflict Zone, ETA, V2V 기반 우선순위·양보 로직 <br> • 🏅 **KAIST 2025 Mobility Challenge 본선진출상 수상** |
 | 2025 <br> 상반기 | Grid-based Automotive Algorithms <br> _(Simulink)_ | • A* path planning and a Pure Pursuit/PID control-based system |
 
 ### 🧠 AI Research & Deep Learning
 | Period | Project | Description & Tech |
 | :--- | :--- | :--- |
-| 2026 <br> 여름방학 | MNIST Recognition Research <br> _(Python, C++, PyTorch, ONNX Runtime, CNN, Attention, Multitask Learning)_ | • n-MNIST 분류에서 clean image 복원 보조 과제의 효과 검증 <br> • 겹친 두 숫자 분류에서 원본 복원 multitask learning 비교 <br> • 겹친 숫자 분류를 위한 shared·class-conditional spatial attention 비교 <br> • 고정 숫자열 인식과 PyTorch·ONNX·C++ 추론 성능 비교 |
-| 2026 <br> 상반기 | Scene-Conditional Dynamic Mask Networks — CIFAR Validation <br> _(PyTorch, ResNet18, CIFAR-10-C)_ | • Scene-conditioned channel mask 구조 검증 <br> • gate/probe/mask-IoU 분석 및 CIFAR negative result 도출 |
-| 2026 <br> 상반기 | Scene-Conditional Dynamic Mask Networks — Driving-scale Validation <br> _(PyTorch, ResNet18, comma2k19)_ | • comma2k19 기반 driving-scale SCDMN 검증 <br> • day/overcast/night context steering regression |
-| 2026 <br> 상반기 | Odor Source Localization (Larva Connectome RL) <br> _(Python, PyTorch, Gymnasium, PPO/SAC, Connectome)_ | • 양측 냄새 센서 기반 odor source localization RL <br> • active sensing 행동의 dynamics/probe/ablation 분석 <br> • 🏆 **BME Graduation Project — 3rd Place** |
+| 2026 <br> 여름방학 | [MNIST Recognition Research](https://github.com/InHyunseo/MNIST-research) <br> _(Python, C++, PyTorch, ONNX Runtime, CNN, Attention, Multitask Learning)_ | • n-MNIST 분류에서 clean image 복원 보조 과제의 효과 검증 <br> • 겹친 두 숫자 분류에서 원본 복원 multitask learning 비교 <br> • 겹친 숫자 분류를 위한 shared·class-conditional spatial attention 비교 <br> • 고정 숫자열 인식과 PyTorch·ONNX·C++ 추론 성능 비교 |
+| 2026 <br> 상반기 | [Scene-Conditional Dynamic Mask Networks — CIFAR Validation](https://github.com/InHyunseo/scdmn-cifar) <br> _(PyTorch, ResNet18, CIFAR-10-C)_ | • Scene-conditioned channel mask 구조 검증 <br> • gate/probe/mask-IoU 분석 및 CIFAR negative result 도출 |
+| 2026 <br> 상반기 | [Scene-Conditional Dynamic Mask Networks — Driving-scale Validation](https://github.com/InHyunseo/scdmn-comma2k19) <br> _(PyTorch, ResNet18, comma2k19)_ | • comma2k19 기반 driving-scale SCDMN 검증 <br> • day/overcast/night context steering regression |
+| 2026 <br> 상반기 | [Odor Source Localization (Larva Connectome RL)](https://github.com/InHyunseo/Brain-inspired-OSL) <br> _(Python, PyTorch, Gymnasium, PPO/SAC, Connectome)_ | • 양측 냄새 센서 기반 odor source localization RL <br> • active sensing 행동의 dynamics/probe/ablation 분석 <br> • 🏆 **BME Graduation Project — 3rd Place** |
 | 2025 <br> 상·하반기 | Connectome-based AI for Drosophila <br> _(PyTorch, DoOR, Connectome)_ | • 초파리 후각 커넥톰 기반 냄새 분류 AI <br> • MLP/RNN/reservoir 모델 튜닝 및 비교 |
 
 ### 🔌 Bioengineering & Embedded Systems
